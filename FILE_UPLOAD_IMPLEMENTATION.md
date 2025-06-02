@@ -27,7 +27,7 @@
      - `python-magic==0.4.27`
 
 ### Frontend Integration
-1. **Contact Form** (`form-contact`)
+1. **Feedback Form** (`form-feedback`)
    - ✅ FileUpload component integrated into App.tsx
    - ✅ File upload appears after successful form submission
    - ✅ Upload results display with success/error messages
@@ -35,7 +35,7 @@
 
 2. **Support Form** (`form-support`)
    - ✅ FileUpload component copied and integrated
-   - ✅ Same functionality as contact form
+   - ✅ Same functionality as feedback form
    - ✅ Appropriate context messaging for support tickets
    - ✅ CSS styling added
 
@@ -98,10 +98,10 @@ docker tag hsqformsapi:latest <registry>/hsqformsapi:latest
 docker push <registry>/hsqformsapi:latest
 
 # Rebuild frontend containers with file upload UI
-cd ../form-contact
-docker build -t hsqformcontact:latest .
-docker tag hsqformcontact:latest <registry>/hsqformcontact:latest
-docker push <registry>/hsqformcontact:latest
+cd ../form-feedback
+docker build -t hsqformfeedback:latest .
+docker tag hsqformfeedback:latest <registry>/hsqformfeedback:latest
+docker push <registry>/hsqformfeedback:latest
 
 cd ../form-support
 docker build -t hsqformsupport:latest .
@@ -137,13 +137,13 @@ docker push <registry>/hsqformsupport:latest
 - `apps/app/alembic/versions/3e7f1234abcd_add_file_attachments_table.py` - New migration
 
 ### Frontend
-- `apps/form-contact/src/App.tsx` - Integrated FileUpload component
-- `apps/form-contact/src/App.css` - Added file upload styles
-- `apps/form-contact/src/FileUpload.tsx` - Existing component (no changes)
+- `apps/form-feedback/src/App.tsx` - Integrated FileUpload component
+- `apps/form-feedback/src/App.css` - Added file upload styles
+- `apps/form-feedback/src/FileUpload.tsx` - Existing component (no changes)
 - `apps/form-support/src/App.tsx` - Integrated FileUpload component  
 - `apps/form-support/src/App.css` - Added file upload styles
-- `apps/form-support/src/FileUpload.tsx` - Copied from contact form
-- `apps/form-support/src/FileUpload.css` - Copied from contact form
+- `apps/form-support/src/FileUpload.tsx` - Copied from feedback form
+- `apps/form-support/src/FileUpload.css` - Copied from feedback form
 
 ## 🔒 SECURITY FEATURES
 
@@ -156,7 +156,7 @@ docker push <registry>/hsqformsupport:latest
 
 ## 💡 USAGE
 
-1. User fills out contact or support form
+1. User fills out feedback or support form
 2. After successful submission, file upload section appears
 3. User can drag/drop or select files (up to 5 files, 10MB each)
 4. Files are validated and uploaded to Azure Blob Storage

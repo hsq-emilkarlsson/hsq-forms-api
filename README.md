@@ -13,7 +13,7 @@
 | Component | URL | Status |
 |-----------|-----|--------|
 | **🔗 API Backend** | [hsq-forms-api.agreeableglacier-1e56cfbb.westeurope.azurecontainerapps.io](https://hsq-forms-api.agreeableglacier-1e56cfbb.westeurope.azurecontainerapps.io) | ✅ Running |
-| **📝 Contact Form** | [ca-hsq-contact-form.agreeableglacier-1e56cfbb.westeurope.azurecontainerapps.io](https://ca-hsq-contact-form.agreeableglacier-1e56cfbb.westeurope.azurecontainerapps.io) | ✅ Running |
+| **📝 Feedback Form** | [ca-hsq-feedback-form.agreeableglacier-1e56cfbb.westeurope.azurecontainerapps.io](https://ca-hsq-feedback-form.agreeableglacier-1e56cfbb.westeurope.azurecontainerapps.io) | ✅ Running |
 | **🎫 Support Form** | [hsq-forms-support.agreeableglacier-1e56cfbb.westeurope.azurecontainerapps.io](https://hsq-forms-support.agreeableglacier-1e56cfbb.westeurope.azurecontainerapps.io) | ✅ Running |
 
 ## 🏗️ Arkitektur
@@ -24,8 +24,8 @@ HSQ Forms Platform
 │   ├── Centraliserad formulärhantering
 │   ├── Database med Alembic migrations
 │   └── RESTful API endpoints
-├── 📝 Contact Form (React + Vite)
-│   ├── Kontaktformulär för allmänna förfrågningar
+├── 📝 Feedback Form (React + Vite)
+│   ├── Feedbackformulär för användarrespons
 │   └── Responsiv design med modern UI
 ├── 🎫 Support Form (React + Vite)
 │   ├── Supportärenden och tekniska frågor
@@ -86,8 +86,8 @@ cd apps/app
 pip install -r requirements.txt
 uvicorn app.main:app --reload
 
-# Contact Form
-cd apps/form-contact
+# Feedback Form
+cd apps/form-feedback
 npm install
 npm run dev
 
@@ -102,7 +102,7 @@ npm run dev
 Skapa `.env` filer i respektive app-mapp:
 
 ```bash
-# apps/form-contact/.env
+# apps/form-feedback/.env
 VITE_API_URL=http://localhost:3001
 
 # apps/form-support/.env  
@@ -118,7 +118,7 @@ DATABASE_URL=postgresql://user:pass@localhost/hsq_forms
 hsq-form-platform/
 ├── apps/                    # Applikationer
 │   ├── app/                # API Backend (FastAPI)
-│   ├── form-contact/       # Kontaktformulär (React)
+│   ├── form-feedback/       # Feedbackformulär (React)
 │   └── form-support/       # Supportformulär (React)
 ├── packages/               # Delade paket
 │   ├── schemas/           # Gemensamma datascheman
@@ -158,6 +158,45 @@ az containerapp update --name hsq-forms-api \
   --resource-group rg-hsq-forms-prod-westeu \
   --image hsqformsprodacr1748847162.azurecr.io/hsq-forms-api:latest
 ```
+
+## 🚀 Azure Deployment (Production)
+
+Se även: `docs/AZURE_DEPLOYMENT_GUIDE.md` för detaljerad steg-för-steg-guide.
+
+### Sammanfattning av produktionsflöde
+
+1. **Bygg och pusha Docker-images**
+   - Använd Container Registry: `hsqformsprodacr1748847162.azurecr.io`
+   - Bygg och pusha images för backend och frontend enligt guiden.
+
+2. **Uppdatera Container Apps**
+   - Gå till Azure Portal → resursgrupp `rg-hsq-forms-prod-westeu`.
+   - Uppdatera image-taggar för:
+     - `hsq-forms-api`
+     - `ca-hsq-feedback-form`
+     - `hsq-forms-support`
+
+3. **Miljövariabler och secrets**
+   - Hantera känsliga värden via Azure Portal → "Secrets" för respektive app.
+   - Kontrollera att Storage Account (`hsqformsstorage`) används för filuppladdningar.
+
+4. **Verifiera deployment**
+   - Kontrollera att apparna startar korrekt och har status "Running".
+   - Testa API och frontend i produktion.
+   - Kontrollera loggar i Log Analytics Workspace (`hsq-forms-logs-workspace`).
+
+5. **Rensning och underhåll**
+   - Ta bort gamla images och överflödiga resurser vid behov.
+   - Rensa gamla revisioner av Container Apps.
+
+6. **Felsökning**
+   - Se `docs/AZURE_DEPLOYMENT_GUIDE.md` för felsökningstips och logghantering.
+
+---
+
+**Tips:**
+- Använd alltid rätt Container Registry och resursgrupp.
+- Uppdatera denna README och deployment-guiden vid förändringar i flödet.
 
 ## 📊 Monitoring
 

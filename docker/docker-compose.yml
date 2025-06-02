@@ -16,13 +16,13 @@ services:
     networks:
       - form-network
 
-  contact-form:
+  feedback-form:
     build:
-      context: ../apps/form-contact
+      context: ../apps/form-feedback
     ports:
-      - "5173:5173"
+      - "3001:3001"
     volumes:
-      - ../apps/form-contact:/app
+      - ../apps/form-feedback:/app
       - /app/node_modules  # Undvik att skriva över node_modules i containern
     working_dir: /app
     command: npm run dev

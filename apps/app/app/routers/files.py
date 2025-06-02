@@ -3,16 +3,7 @@ File upload router för HSQ Forms API
 Hanterar säker filuppladdning till Azure Blob Storage eller lokal lagring
 """
 import os
-import    except Exception as e:
-        logger.error(f"Oväntat fel vid temporär filuppladdning: {str(e)}")
-        
-        # Rensa upp eventuella framgångsrika uppladdningar vid fel
-        for file_attachment in successful_uploads:
-            try:
-                await storage_service.delete_file(file_attachment.stored_filename, temp_submission_id)
-                db.delete(file_attachment)
-            except Exception as cleanup_error:
-                logger.error(f"Fel vid upprensning: {str(cleanup_error)}") logging
+import logging
 from typing import List, Optional
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, status, Form
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -313,38 +304,28 @@ async def upload_temporary_files(
 ):
     """
     Ladda upp temporära filer innan formulärinlämning
-    
     - **files**: Lista med filer att ladda upp (max 5 filer, 10MB vardera)
-    
     Säkerhetsfunktioner:
     - Filtypsvalidering
     - Storleksbegränsning
     - Virusscanning via innehållsanalys
     - Säker filnamnshantering
-    
     Temporära filer sparas utan koppling till en submission_id och kan senare kopplas till en submission.
     """
-    
     # Begränsa antal filer
     if len(files) > 5:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Maximalt 5 filer tillåtna per uppladdning"
         )
-    
     # Kontrollera att inga filer är tomma
     if not files or all(file.filename == "" for file in files):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Inga filer valda för uppladdning"
         )
-    
-    # Använd "temp" som submission_id för temporära filer
-    temp_submission_id = "temp"
-    
     upload_results = []
     successful_uploads = []
-    
     try:
         for file in files:
             if not file.filename:
@@ -354,11 +335,26 @@ async def upload_temporary_files(
                     original_filename=None
                 ))
                 continue
-            
-            # Ladda upp fil med vald storage service
             try:
-                file_id, file_size, content_type = await storage_service.upload_file(file, temp_submission_id)
-                
+                # Alltid använd dedikerad temp-upload-metod om den finns
+                if use_azure and hasattr(storage_service, "upload_file_temp"):
+                    file_id, file_size, content_type = await storage_service.upload_file_temp(file)
+                elif not use_azure and hasattr(storage_service, "upload_file_temp"):
+                    file_id, file_size, content_type = await storage_service.upload_file_temp(file)
+                else:
+                    # Fallback: använd en dedikerad temp-mapp, inte en "submission_id"
+                    if use_azure:
+                        # Skapa ett unikt temp-blob-namn
+                        file_id, file_size, content_type = await storage_service.upload_file(file, "temp-uploads", folder_prefix="temp-uploads")
+                    else:
+                        # För lokal lagring, skapa en temp-mapp om den inte finns
+                        temp_dir = "temp-uploads"
+                        if not hasattr(storage_service, "upload_file_temp"):
+                            # Skapa temp-mapp om den inte finns
+                            from pathlib import Path
+                            temp_path = Path(storage_service.upload_dir) / temp_dir
+                            temp_path.mkdir(exist_ok=True)
+                        file_id, file_size, content_type = await storage_service.upload_file(file, temp_dir)
                 # Spara filinformation i databasen som temporär fil
                 file_attachment = FileAttachment(
                     submission_id=None,  # Ingen koppling till submission ännu
@@ -366,16 +362,17 @@ async def upload_temporary_files(
                     stored_filename=file_id,
                     file_size=file_size,
                     content_type=content_type,
-                    blob_url=f"/files/{file_id}" if not use_azure else f"https://{storage_service.account_name}.blob.core.windows.net/{storage_service.container_name}/{file_id}",
+                    blob_url=(
+                        f"/files/{file_id}" if not use_azure else
+                        f"https://{getattr(storage_service, 'account_name', 'account')}.blob.core.windows.net/"
+                        f"{getattr(storage_service, 'container_name', 'temp-uploads')}/{file_id}"
+                    ),
                     upload_status="temporary"
                 )
-                
                 db.add(file_attachment)
                 db.commit()
                 db.refresh(file_attachment)
-                
                 successful_uploads.append(file_attachment)
-                
                 upload_results.append(FileUploadResponse(
                     success=True,
                     message=f"Fil {file.filename} uppladdad temporärt",
@@ -383,9 +380,7 @@ async def upload_temporary_files(
                     original_filename=file.filename,
                     file_size=file_attachment.file_size
                 ))
-                
-                logger.info(f"Temporär fil {file.filename} uppladdad")
-                
+                logger.info(f"Temporär fil {file.filename} uppladdad (id={file_id})")
             except HTTPException as http_error:
                 upload_results.append(FileUploadResponse(
                     success=False,
@@ -401,13 +396,21 @@ async def upload_temporary_files(
                     original_filename=file.filename
                 ))
                 continue
-                
     except Exception as e:
         logger.error(f"Oväntat fel vid temporär filuppladdning: {str(e)}")
-        
         # Rensa upp eventuella framgångsrika uppladdningar vid fel
         for file_attachment in successful_uploads:
             try:
-                await storage_service.delete_file(file_attachment.stored_filename, temp_submission_id)
+                if use_azure and hasattr(storage_service, "delete_file_temp"):
+                    await storage_service.delete_file_temp(file_attachment.stored_filename)
+                else:
+                    await storage_service.delete_file(file_attachment.stored_filename, "temp-uploads")
                 db.delete(file_attachment)
-           
+            except Exception as cleanup_error:
+                logger.warning(f"Fel vid borttagning av temporär fil {file_attachment.stored_filename}: {cleanup_error}")
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Oväntat fel vid temporär filuppladdning"
+        )
+    return upload_results

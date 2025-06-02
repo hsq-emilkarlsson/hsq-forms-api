@@ -151,19 +151,19 @@ az containerapp create \
 API_URL=$(az containerapp show --name hsq-forms-api --resource-group $RESOURCE_GROUP --query properties.configuration.ingress.fqdn --output tsv)
 print_success "Backend API deployad: https://$API_URL"
 
-print_step "9. Bygg och pusha Contact Form"
-cd apps/form-contact
-docker build -f Dockerfile.prod -t $ACR_NAME.azurecr.io/hsq-contact-form:latest .
-docker push $ACR_NAME.azurecr.io/hsq-contact-form:latest
+print_step "9. Bygg och pusha Feedback Form"
+cd apps/form-feedback
+docker build -f Dockerfile.prod -t $ACR_NAME.azurecr.io/hsq-feedback-form:latest .
+docker push $ACR_NAME.azurecr.io/hsq-feedback-form:latest
 cd ../..
-print_success "Contact Form pushad till registry"
+print_success "Feedback Form pushad till registry"
 
-print_step "10. Deploy Contact Form"
+print_step "10. Deploy Feedback Form"
 az containerapp create \
-  --name hsq-contact-form \
+  --name hsq-feedback-form \
   --resource-group $RESOURCE_GROUP \
   --environment $ENVIRONMENT \
-  --image $ACR_NAME.azurecr.io/hsq-contact-form:latest \
+  --image $ACR_NAME.azurecr.io/hsq-feedback-form:latest \
   --target-port 80 \
   --ingress external \
   --registry-server $ACR_NAME.azurecr.io \
@@ -172,8 +172,8 @@ az containerapp create \
   --cpu 0.25 \
   --memory 0.5Gi
 
-CONTACT_URL=$(az containerapp show --name hsq-contact-form --resource-group $RESOURCE_GROUP --query properties.configuration.ingress.fqdn --output tsv)
-print_success "Contact Form deployad: https://$CONTACT_URL"
+FEEDBACK_URL=$(az containerapp show --name hsq-feedback-form --resource-group $RESOURCE_GROUP --query properties.configuration.ingress.fqdn --output tsv)
+print_success "Feedback Form deployad: https://$FEEDBACK_URL"
 
 print_step "11. Bygg och pusha Support Form"
 cd apps/form-support
@@ -203,7 +203,7 @@ print_step "13. Uppdatera CORS-inställningar"
 az containerapp update \
   --name hsq-forms-api \
   --resource-group $RESOURCE_GROUP \
-  --set-env-vars ALLOWED_ORIGINS="https://$CONTACT_URL,https://$SUPPORT_URL"
+  --set-env-vars ALLOWED_ORIGINS="https://$FEEDBACK_URL,https://$SUPPORT_URL"
 
 print_success "CORS-inställningar uppdaterade"
 
@@ -222,7 +222,7 @@ echo "Database Password: $DB_PASSWORD"
 echo ""
 echo "🌐 URL:er:"
 echo "API: https://$API_URL"
-echo "Contact Form: https://$CONTACT_URL"
+echo "Feedback Form: https://$FEEDBACK_URL"
 echo "Support Form: https://$SUPPORT_URL"
 echo ""
 echo "💰 Uppskattad kostnad: ~1000-1500 SEK/månad"
@@ -257,7 +257,7 @@ Server: $ACR_NAME.azurecr.io
 URLs:
 -----
 API: https://$API_URL
-Contact Form: https://$CONTACT_URL
+Feedback Form: https://$FEEDBACK_URL
 Support Form: https://$SUPPORT_URL
 
 Cleanup Command:
