@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import './App.css';
+import FileUpload, { type FileUploadResult } from './FileUpload';
 
 // Interface för support-formulärdata
 interface SupportFormData {
@@ -44,10 +45,23 @@ function App() {
   const [status, setStatus] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
+  const [submissionId, setSubmissionId] = useState<string | null>(null);
+  const [showFileUpload, setShowFileUpload] = useState(false);
+  const [uploadResults, setUploadResults] = useState<FileUploadResult[]>([]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
+  };
+
+  const handleFilesUploaded = (files: FileUploadResult[]) => {
+    setUploadResults(files);
+    const successfulUploads = files.filter(f => f.success);
+    if (successfulUploads.length > 0) {
+      setStatus(prevStatus => 
+        prevStatus + ` ${successfulUploads.length} fil(er) har laddats upp.`
+      );
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -84,6 +98,8 @@ function App() {
       
       if (result.status === 'success') {
         setStatus('Ditt support-ärende har skickats! Vi återkommer inom 24 timmar.');
+        setSubmissionId(result.submission_id || null);
+        setShowFileUpload(true);
         // Rensa formuläret vid lyckad sändning
         setFormData({
           name: '',
@@ -256,6 +272,32 @@ function App() {
                 <li key={index}>{error}</li>
               ))}
             </ul>
+          )}
+        </div>
+      )}
+
+      {showFileUpload && submissionId && (
+        <div className="file-upload-section">
+          <h2>Bifoga filer (valfritt)</h2>
+          <p>Du kan bifoga filer som skärmdumpar, felloggar eller andra dokument som kan hjälpa oss att lösa ditt problem snabbare.</p>
+          <FileUpload
+            submissionId={submissionId}
+            onFilesUploaded={handleFilesUploaded}
+            maxFiles={5}
+            maxSizePerFile={10 * 1024 * 1024} // 10MB
+          />
+          
+          {uploadResults.length > 0 && (
+            <div className="upload-results">
+              <h3>Uppladdningsresultat:</h3>
+              <ul>
+                {uploadResults.map((result, index) => (
+                  <li key={index} className={result.success ? 'success' : 'error'}>
+                    {result.original_filename}: {result.message}
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </div>
       )}

@@ -121,3 +121,64 @@ button:disabled {
 .read-the-docs {
   color: #888;
 }
+
+/* File upload section styles */
+.file-upload-section {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background-color: #f9fafb;
+}
+
+.file-upload-section h2 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+  color: #374151;
+  font-size: 1.25rem;
+}
+
+.file-upload-section p {
+  margin-bottom: 1rem;
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+.upload-results {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 6px;
+  background-color: white;
+}
+
+.upload-results h3 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+  color: #374151;
+  font-size: 1rem;
+}
+
+.upload-results ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.upload-results li {
+  padding: 0.5rem;
+  margin-bottom: 0.25rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.upload-results li.success {
+  background-color: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+.upload-results li.error {
+  background-color: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}

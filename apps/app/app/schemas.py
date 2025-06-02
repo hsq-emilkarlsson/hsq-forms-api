@@ -1,9 +1,23 @@
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
-from typing import Dict, Any, Optional, Literal
+from typing import Dict, Any, Optional, Literal, List
 from datetime import datetime
 
 # Definiera tillåtna formulärtyper
 FormType = Literal["contact", "newsletter", "job_application", "support_ticket"]
+
+class FileAttachmentResponse(BaseModel):
+    """Schema för filbilagor i API-respons"""
+    model_config = ConfigDict(from_attributes=True)
+    
+    id: str
+    submission_id: str
+    original_filename: str
+    stored_filename: str
+    file_size: int
+    content_type: str
+    blob_url: Optional[str] = None
+    upload_status: str
+    created_at: datetime
 
 class FormSubmissionBase(BaseModel):
     name: str = Field(..., min_length=2, max_length=100, description="Namn på avsändaren")
@@ -29,7 +43,8 @@ class FormSubmissionResponse(FormSubmissionBase):
                 "is_processed": False,
                 "ip_address": "192.168.1.1",
                 "user_agent": "Mozilla/5.0...",
-                "metadata": {"source": "website"}
+                "metadata": {"source": "website"},
+                "attachments": []
             }
         }
     )
@@ -42,3 +57,12 @@ class FormSubmissionResponse(FormSubmissionBase):
     ip_address: Optional[str] = None
     user_agent: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
+    attachments: List[FileAttachmentResponse] = Field(default_factory=list, description="Bifogade filer")
+
+class FileUploadResponse(BaseModel):
+    """Respons för filuppladdning"""
+    success: bool
+    message: str
+    file_id: Optional[str] = None
+    original_filename: Optional[str] = None
+    file_size: Optional[int] = None

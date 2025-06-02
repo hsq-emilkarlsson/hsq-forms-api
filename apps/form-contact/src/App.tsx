@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import './App.css';
+import FileUpload, { type FileUploadResult } from './FileUpload';
 
 // Interface för formulärdata
 interface FormData {
@@ -33,9 +34,22 @@ function App() {
   const [status, setStatus] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
+  const [submissionId, setSubmissionId] = useState<string | null>(null);
+  const [showFileUpload, setShowFileUpload] = useState(true); // Alltid visa filuppladdning
+  const [uploadResults, setUploadResults] = useState<FileUploadResult[]>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<FileUploadResult[]>([]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleFilesUploaded = (files: FileUploadResult[]) => {
+    setUploadResults(files);
+    const successfulUploads = files.filter(f => f.success);
+    if (successfulUploads.length > 0) {
+      setUploadedFiles(prev => [...prev, ...successfulUploads]);
+      setStatus(`${successfulUploads.length} fil(er) har laddats upp.`);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -49,19 +63,27 @@ function App() {
       const apiUrl = isProd
         ? 'https://hsq-forms-api.agreeableglacier-1e56cfbb.westeurope.azurecontainerapps.io/submit'  
         : 'http://localhost:8000/submit';
+      
+      // Inkludera eventuella uppladdade file_ids
+      const formDataWithFiles = {
+        ...formData,
+        files: uploadedFiles.map(file => file.file_id).filter(Boolean)
+      };
 
       const res = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(formDataWithFiles),
       });
 
       const result = await res.json() as ApiResponse;
       
       if (result.status === 'success') {
         setStatus(result.message || 'Formuläret har skickats!');
+        setSubmissionId(result.submission_id || null);
+        setShowFileUpload(true);
         // Rensa formuläret vid lyckad sändning
         setFormData({
           name: '',
@@ -141,6 +163,46 @@ function App() {
                 <li key={index}>{error}</li>
               ))}
             </ul>
+          )}
+        </div>
+      )}
+
+      {showFileUpload && (
+        <div className="file-upload-section">
+          <h2>Bifoga filer (valfritt)</h2>
+          <p>Du kan bifoga filer till din förfrågan. Tillåtna filtyper: bilder, PDF, Word, Excel, textfiler.</p>
+          <FileUpload
+            submissionId={submissionId || undefined}
+            onFilesUploaded={handleFilesUploaded}
+            maxFiles={5}
+            maxSizePerFile={10 * 1024 * 1024} // 10MB
+            temporaryUploads={true}
+          />
+          
+          {uploadResults.length > 0 && (
+            <div className="upload-results">
+              <h3>Uppladdningsresultat:</h3>
+              <ul>
+                {uploadResults.map((result, index) => (
+                  <li key={index} className={result.success ? 'success' : 'error'}>
+                    {result.original_filename}: {result.message}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {uploadedFiles.length > 0 && (
+            <div className="uploaded-files">
+              <h3>Uppladdade filer:</h3>
+              <ul>
+                {uploadedFiles.map((file, index) => (
+                  <li key={index}>
+                    {file.original_filename}
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </div>
       )}

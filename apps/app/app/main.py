@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from dotenv import load_dotenv
 from .db import init_db
-from .routers import submit
+from .routers import submit, files
 
 # Ladda miljövariabler
 load_dotenv()
@@ -108,8 +108,13 @@ def read_root():
             },
             "future_endpoints": {
                 "auth": "POST /auth/login - Användareautenticering (kommande)",
-                "files": "POST /files/upload - Filuppladdning (kommande)",
                 "admin": "GET /admin/* - Administrationsendpoints (kommande)"
+            },
+            "files": {
+                "upload": "POST /files/upload/{submission_id} - Ladda upp filer till formulär",
+                "list": "GET /files/submission/{submission_id} - Hämta filer för formulär",
+                "delete": "DELETE /files/{file_id} - Ta bort fil",
+                "info": "GET /files/{file_id}/info - Hämta filinformation"
             }
         },
         "supported_form_types": [
@@ -122,3 +127,4 @@ def read_root():
 
 # Lägg till endpoints från routers
 app.include_router(submit.router)
+app.include_router(files.router)
