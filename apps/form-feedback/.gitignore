@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# Problematic entry point files that conflict with Vite
+index.js
+main.js
+entry.js
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
