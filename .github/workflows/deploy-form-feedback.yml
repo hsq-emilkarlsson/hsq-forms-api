@@ -150,33 +150,6 @@ jobs:
             echo "✅ No direct references to .tsx files found in build output"
           fi
 
-      - name: Prepare clean deployment
-        working-directory: ${{ env.APP_LOCATION }}
-        run: |
-          echo "🧹 Preparing clean deployment by removing source files..."
-          
-          # Create a temporary backup of source files
-          mkdir -p ../temp-backup
-          cp -r src ../temp-backup/ || true
-          cp index.html ../temp-backup/ || true
-          
-          # Remove ALL source files from app directory to prevent deployment
-          rm -rf src/
-          rm -f index.html
-          rm -f *.js
-          rm -f *.ts
-          rm -f *.tsx
-          
-          # Only keep essential files
-          echo "📁 Files remaining in app directory:"
-          ls -la
-          
-          # Verify dist folder is intact
-          echo "📁 Contents of dist folder:"
-          ls -la ${{ env.OUTPUT_LOCATION }}/
-          
-          echo "✅ Clean deployment prepared - only built files will be deployed"
-
       - name: Deploy to Azure Static Web Apps
         id: deploy
         uses: Azure/static-web-apps-deploy@v1
@@ -184,20 +157,10 @@ jobs:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_ICY_FLOWER_030D4AC03 }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: "upload"
-          app_location: ${{ env.APP_LOCATION }}
+          app_location: ${{ env.APP_LOCATION }}/dist
           api_location: ""
-          output_location: ${{ env.OUTPUT_LOCATION }}
+          output_location: ""
           skip_app_build: true
-      
-      - name: Restore source files
-        if: always()
-        working-directory: ${{ env.APP_LOCATION }}
-        run: |
-          echo "🔄 Restoring source files from backup..."
-          cp -r ../temp-backup/src . || true
-          cp ../temp-backup/index.html . || true
-          rm -rf ../temp-backup/
-          echo "✅ Source files restored"
           
       - name: Post-deployment verification
         if: steps.deploy.outcome == 'success'
