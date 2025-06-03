@@ -1,61 +1,75 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import App from './App';
 import './index.css';
-import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
-import localesRaw from './locales.json';
 import ErrorBoundary from './ErrorBoundary';
+import localesRaw from './locales.json';
 
-// Type check locales
-const locales: Record<string, any> = localesRaw;
+// Type definitions
+interface LocaleData {
+  [key: string]: string;
+}
 
-// AppWithLang component that safely selects language based on URL parameter
+interface Locales {
+  [lang: string]: LocaleData;
+}
+
+const locales = localesRaw as Locales;
+
+// Language wrapper component
 function AppWithLang() {
-  // Always call hooks at the top level
-  const params = useParams();
+  const params = useParams<{ lang: string }>();
   const { lang } = params;
   
-  console.log("AppWithLang rendering, params:", params);
-  console.log("Lang param:", lang);
-  
-  // Safe language selection with fallback
   const language = lang && locales[lang] ? lang : 'se';
-  console.log("Selected language:", language);
-  console.log("Translations available:", Object.keys(locales));
-  console.log("Using translations:", locales[language]);
-  
-  // Create diagnostic trace for debugging
-  const now = new Date().toISOString();
-  console.log(`[DIAGNOSTIC] AppWithLang rendered at ${now}, lang=${language}`);
   
   return <App lang={language} translations={locales[language]} />;
 }
 
-// Main rendering with error handling
+// Initialize app
 const rootElement = document.getElementById('root');
+
 if (!rootElement) {
-  console.error('Failed to find the root element. The app cannot be rendered.');
-  document.body.innerHTML = '<div style="color: red; padding: 20px;">Error: Root element not found</div>';
+  console.error('Root element not found');
+  document.body.innerHTML = `
+    <div style="background: #ff4444; color: white; padding: 20px; text-align: center;">
+      <h1>🚫 KRITISKT FEL</h1>
+      <p>Root element saknas. Kontakta support.</p>
+    </div>
+  `;
 } else {
   try {
+    console.log('🚀 Starting Husqvarna Form Feedback App');
+    console.log('📍 Available languages:', Object.keys(locales));
+    
     ReactDOM.createRoot(rootElement).render(
       <React.StrictMode>
         <ErrorBoundary>
           <BrowserRouter>
             <Routes>
               <Route path="/" element={<Navigate to="/se" replace />} />
-              <Route path=":lang" element={<AppWithLang />} />
+              <Route path="/se" element={<App lang="se" translations={locales.se} />} />
+              <Route path="/en" element={<App lang="en" translations={locales.en} />} />
+              <Route path="/:lang" element={<AppWithLang />} />
               <Route path="*" element={<Navigate to="/se" replace />} />
             </Routes>
           </BrowserRouter>
         </ErrorBoundary>
       </React.StrictMode>
     );
-    console.log('React app successfully rendered');
+    
+    console.log('✅ App initialized successfully');
   } catch (error) {
-    console.error('Failed to render the React app:', error);
-    document.body.innerHTML = '<div style="color: red; padding: 20px;">Error: Failed to render the app. See console for details.</div>';
+    console.error('❌ Failed to initialize app:', error);
+    rootElement.innerHTML = `
+      <div style="background: #ff4444; color: white; padding: 20px; text-align: center; font-family: Arial, sans-serif;">
+        <h1>🚫 Något gick fel</h1>
+        <p><strong>Fel:</strong> ${error instanceof Error ? error.message : String(error)}</p>
+        <button onclick="window.location.reload()" style="background: white; color: #ff4444; padding: 10px 20px; border: none; border-radius: 4px; margin-top: 10px; cursor: pointer;">
+          🔄 Ladda om sidan
+        </button>
+      </div>
+    `;
   }
 }
-
-export {};
