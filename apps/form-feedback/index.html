@@ -17,7 +17,9 @@
           '</div>';
       });
     </script>
-    <!-- No base href - rely on relative paths -->
+    <!-- Debug tools for production troubleshooting -->
+    <script src="/debug-client.js" defer></script>
+    <!-- Allow Vite to inject the proper script during build -->
     <script type="module" src="/src/main.tsx"></script>
   </head>
   <body>

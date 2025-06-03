@@ -1,8 +1,16 @@
 {
   "routes": [
     {
+      "route": "/*.js",
+      "headers": { "Content-Type": "application/javascript" }
+    },
+    {
       "route": "/assets/*.js",
       "headers": { "Content-Type": "application/javascript" }
+    },
+    {
+      "route": "/*.css",
+      "headers": { "Content-Type": "text/css" }
     },
     {
       "route": "/assets/*.css",

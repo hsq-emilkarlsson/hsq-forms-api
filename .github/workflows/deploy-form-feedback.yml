@@ -70,12 +70,50 @@ jobs:
           fi
           echo "--- Build Output Directory Structure ---"
           ls -la ${{ env.OUTPUT_LOCATION }}
+          echo "--- JavaScript Asset Check ---"
+          JS_FILES=$(find ${{ env.OUTPUT_LOCATION }}/assets -name "*.js" | wc -l)
+          if [ "$JS_FILES" -eq "0" ]; then
+            echo "ERROR: No JavaScript files found in assets directory!"
+            exit 1
+          else
+            echo "✅ Found $JS_FILES JavaScript files in assets directory"
+            ls -la ${{ env.OUTPUT_LOCATION }}/assets/*.js
+          fi
           echo "--- Critical Files Check ---"
           echo "index.html exists: $(test -f ${{ env.OUTPUT_LOCATION }}/index.html && echo 'Yes' || echo 'No')"
           echo "staticwebapp.config.json exists: $(test -f ${{ env.OUTPUT_LOCATION }}/staticwebapp.config.json && echo 'Yes' || echo 'No')"
           echo "routes.json exists: $(test -f ${{ env.OUTPUT_LOCATION }}/routes.json && echo 'Yes' || echo 'No')"
-          echo "--- First 10 lines of index.html ---"
-          head -n 10 ${{ env.OUTPUT_LOCATION }}/index.html
+          echo "--- Checking index.html for script references ---"
+          if grep -q "src=\"/assets/" ${{ env.OUTPUT_LOCATION }}/index.html; then
+            echo "✅ index.html correctly references assets"
+          else
+            echo "WARNING: index.html might not reference assets correctly"
+            echo "Content of index.html:"
+            cat ${{ env.OUTPUT_LOCATION }}/index.html
+          fi
+      - name: Check for MIME type configurations
+        working-directory: ${{ env.APP_LOCATION }}
+        run: |
+          echo "Checking MIME type configurations..."
+          
+          # Check staticwebapp.config.json for proper MIME settings
+          if [ -f "${{ env.OUTPUT_LOCATION }}/staticwebapp.config.json" ]; then
+            if grep -q "application/javascript" "${{ env.OUTPUT_LOCATION }}/staticwebapp.config.json"; then
+              echo "✅ staticwebapp.config.json has JavaScript MIME type set correctly"
+            else
+              echo "WARNING: staticwebapp.config.json may not have JavaScript MIME type set correctly"
+            fi
+          fi
+          
+          # Check routes.json for proper configurations if it exists
+          if [ -f "${{ env.OUTPUT_LOCATION }}/routes.json" ]; then
+            if grep -q "application/javascript" "${{ env.OUTPUT_LOCATION }}/routes.json"; then
+              echo "✅ routes.json has JavaScript MIME type set correctly"
+            else
+              echo "WARNING: routes.json may not have JavaScript MIME type set correctly"
+            fi
+          fi
+
       - name: Deploy to Azure Static Web Apps
         id: deploy
         uses: Azure/static-web-apps-deploy@v1

@@ -1,10 +1,11 @@
 // apps/form-feedback/vite.config.ts
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { resolve } from 'path';
 
 export default defineConfig({
   plugins: [react()],
-  // Explicitly set base path to root
+  // Explicitly set base path to root for Azure SWA
   base: '/',
   server: {
     host: true,
@@ -23,6 +24,9 @@ export default defineConfig({
       },
     },
     rollupOptions: {
+      input: {
+        main: resolve(__dirname, 'index.html'),
+      },
       output: {
         manualChunks: {
           react: ['react', 'react-dom'],
