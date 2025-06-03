@@ -28,6 +28,11 @@ function App({ lang, translations }: AppProps) {
   console.log("App component rendering with lang:", lang);
   console.log("Translations provided:", translations);
   
+  // Add immediate visual feedback
+  useEffect(() => {
+    document.title = `Husqvarna Feedback - ${lang}`;
+  }, [lang]);
+  
   // Report rendering to help debug white screen issues
   useEffect(() => {
     console.log("App component mounted successfully");
@@ -161,10 +166,16 @@ function App({ lang, translations }: AppProps) {
     }
   };
 
-  // Force error if translations are missing
-  if (!translations) {
-    console.error("No translations provided to App component!");
-    return <div style={{padding: '20px', color: 'red'}}>Error: Missing translations data. Please check console.</div>;
+  // Force error if translations are missing or empty
+  if (!translations || Object.keys(translations).length === 0) {
+    console.error("No or empty translations provided to App component!", translations);
+    return (
+      <div style={{padding: '40px', color: 'white', background: '#b22222', textAlign: 'center'}}>
+        <h2>Fel: Saknar översättningar</h2>
+        <p>Appen kunde inte ladda språkfiler eller översättningar. Kontrollera att locales.json är korrekt bunden i produktion.</p>
+        <p>Kontakta support om felet kvarstår.</p>
+      </div>
+    );
   }
 
   return (
