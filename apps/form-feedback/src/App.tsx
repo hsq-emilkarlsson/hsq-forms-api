@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import './App.css';
 import FileUpload, { type FileUploadResult } from './FileUpload';
 
@@ -25,15 +25,44 @@ interface ApiResponse {
 }
 
 function App({ lang, translations }: AppProps) {
+  console.log("App component rendering with lang:", lang);
+  console.log("Translations provided:", translations);
+  
+  // Report rendering to help debug white screen issues
+  useEffect(() => {
+    console.log("App component mounted successfully");
+    
+    // Log environment information to help with debugging
+    console.log("Window location:", window.location.href);
+    console.log("User agent:", navigator.userAgent);
+    
+    // Create a diagnostic element for debugging purposes
+    const diagnosticDiv = document.createElement('div');
+    diagnosticDiv.id = 'app-diagnostic';
+    diagnosticDiv.style.display = 'none';
+    diagnosticDiv.dataset.rendered = 'true';
+    diagnosticDiv.dataset.lang = lang;
+    diagnosticDiv.dataset.timestamp = new Date().toISOString();
+    document.body.appendChild(diagnosticDiv);
+    
+    return () => {
+      if (diagnosticDiv.parentNode) {
+        diagnosticDiv.parentNode.removeChild(diagnosticDiv);
+      }
+    };
+  }, [lang]);
+  
   const [formData, setFormData] = useState<FormData>({
     name: '',
     email: '',
     message: '',
-    form_type: 'contact', // Ändrat från 'feedback' till 'contact' för att matcha backend
+    form_type: 'contact', // Changed from 'feedback' to 'contact' to match backend
     metadata: {
       source: 'web',
       page: window.location.pathname,
-      language: lang, // Använder lang-parametern för att spara det valda språket i metadata
+      language: lang, // Using the lang parameter to save the selected language in metadata
+      userAgent: navigator.userAgent.substring(0, 200), // Adding user agent for diagnostics
+      timestamp: new Date().toISOString()
     }
   });
 
@@ -132,6 +161,12 @@ function App({ lang, translations }: AppProps) {
     }
   };
 
+  // Force error if translations are missing
+  if (!translations) {
+    console.error("No translations provided to App component!");
+    return <div style={{padding: '20px', color: 'red'}}>Error: Missing translations data. Please check console.</div>;
+  }
+
   return (
     <div className="husqvarna-bg">
       <div className="form-container husqvarna-form">
@@ -140,6 +175,10 @@ function App({ lang, translations }: AppProps) {
             src="https://portal.husqvarnagroup.com/static/b2b/assets/with-name.4d5589ae.svg"
             alt="Husqvarna logo"
             className="husqvarna-logo"
+            onError={(e) => { 
+              console.log("Logo failed to load");
+              e.currentTarget.src = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODQiIGhlaWdodD0iODQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9Ijg0IiBoZWlnaHQ9Ijg0IiBmaWxsPSIjMDAyRjZDIi8+PHRleHQgeD0iMTAiIHk9IjUwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IndoaXRlIj5IdXNxdmFybmE8L3RleHQ+PC9zdmc+"; 
+            }}
           />
         </div>
         <header className="app-header">

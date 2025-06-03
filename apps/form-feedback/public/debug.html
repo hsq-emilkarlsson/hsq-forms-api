@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Debug Page</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    h1 {
+      color: #002F6C;
+    }
+    .debug-section {
+      background-color: #f5f5f5;
+      padding: 15px;
+      margin-bottom: 20px;
+      border-radius: 5px;
+    }
+    .test-button {
+      background-color: #002F6C;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-bottom: 10px;
+    }
+    pre {
+      background-color: #eee;
+      padding: 10px;
+      border-radius: 5px;
+      overflow-x: auto;
+    }
+    #log {
+      margin-top: 20px;
+      background: #f9f9f9;
+      border: 1px solid #ddd;
+      padding: 10px;
+      height: 200px;
+      overflow: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>Debug Page for Husqvarna Feedback Form</h1>
+
+  <div class="debug-section">
+    <h2>Environment Information</h2>
+    <div id="env-info"></div>
+  </div>
+
+  <div class="debug-section">
+    <h2>Routing Test</h2>
+    <button class="test-button" onclick="testRoute('/')">Test Root Route</button>
+    <button class="test-button" onclick="testRoute('/se')">Test Swedish Route</button>
+    <button class="test-button" onclick="testRoute('/en')">Test English Route</button>
+  </div>
+
+  <div class="debug-section">
+    <h2>Image Loading Test</h2>
+    <button class="test-button" onclick="testImageLoading()">Test Logo Loading</button>
+    <div id="image-test-result" style="margin-top: 10px;"></div>
+  </div>
+
+  <div class="debug-section">
+    <h2>JS Loading Test</h2>
+    <button class="test-button" onclick="testScripts()">Test Script Loading</button>
+    <div id="script-test-result" style="margin-top: 10px;"></div>
+  </div>
+
+  <div class="debug-section">
+    <h2>Console Log</h2>
+    <div id="log"></div>
+  </div>
+
+  <script>
+    // Display environment information
+    function displayEnvironmentInfo() {
+      const envInfo = document.getElementById('env-info');
+      envInfo.innerHTML = `
+        <p><strong>URL:</strong> ${window.location.href}</p>
+        <p><strong>User Agent:</strong> ${navigator.userAgent}</p>
+        <p><strong>Window Size:</strong> ${window.innerWidth}x${window.innerHeight}</p>
+      `;
+    }
+
+    // Test routing
+    function testRoute(route) {
+      log(`Testing route: ${route}`);
+      fetch(route)
+        .then(response => {
+          log(`Route ${route} - Status: ${response.status}`);
+          return response.text();
+        })
+        .then(html => {
+          const hasIndexHTML = html.includes('<div id="root"></div>');
+          log(`Route ${route} - Has root div: ${hasIndexHTML}`);
+        })
+        .catch(error => {
+          log(`Error testing route ${route}: ${error.message}`);
+        });
+    }
+
+    // Test image loading
+    function testImageLoading() {
+      log('Testing logo image loading...');
+      const img = new Image();
+      const imageTestResult = document.getElementById('image-test-result');
+      
+      img.onload = function() {
+        log('Logo image loaded successfully!');
+        imageTestResult.innerHTML = `<p style="color:green">✓ Logo loaded: ${img.width}x${img.height}px</p>`;
+        imageTestResult.appendChild(img);
+      };
+      
+      img.onerror = function() {
+        log('Error loading logo image');
+        imageTestResult.innerHTML = '<p style="color:red">✗ Logo failed to load</p>';
+      };
+      
+      img.src = 'https://portal.husqvarnagroup.com/static/b2b/assets/with-name.4d5589ae.svg';
+      img.style.maxWidth = '200px';
+    }
+
+    // Test script loading
+    function testScripts() {
+      log('Testing script loading...');
+      const scriptTestResult = document.getElementById('script-test-result');
+      
+      // Check if main JS file exists
+      fetch('/assets/index.js')
+        .then(response => {
+          if (response.ok) {
+            log('Main JS file exists');
+            scriptTestResult.innerHTML = '<p style="color:green">✓ Main JS file exists</p>';
+          } else {
+            log(`Main JS file not found: ${response.status}`);
+            scriptTestResult.innerHTML = '<p style="color:red">✗ Main JS file not found</p>';
+          }
+        })
+        .catch(error => {
+          log(`Error checking JS file: ${error.message}`);
+          scriptTestResult.innerHTML = `<p style="color:red">✗ Error: ${error.message}</p>`;
+        });
+    }
+
+    // Logging function
+    function log(message) {
+      const logElement = document.getElementById('log');
+      const timestamp = new Date().toLocaleTimeString();
+      logElement.innerHTML += `<div>[${timestamp}] ${message}</div>`;
+      logElement.scrollTop = logElement.scrollHeight;
+      console.log(`[DEBUG] ${message}`);
+    }
+
+    // Initialize
+    displayEnvironmentInfo();
+    log('Debug page loaded');
+  </script>
+</body>
+</html>

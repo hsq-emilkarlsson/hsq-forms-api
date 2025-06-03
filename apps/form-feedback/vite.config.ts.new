@@ -1,6 +1,7 @@
 // apps/form-feedback/vite.config.ts
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import path from 'path';
 
 export default defineConfig({
   plugins: [react()],
@@ -20,21 +21,21 @@ export default defineConfig({
     },
     rollupOptions: {
       input: {
-        main: './index.html',
-        debug: './public/debug.html',
-        fallback: './public/fallback.html'
+        main: path.resolve(__dirname, 'index.html'),
+        debug: path.resolve(__dirname, 'public/debug.html'),
+        fallback: path.resolve(__dirname, 'public/fallback.html')
       },
       output: {
         manualChunks: {
-          react: ['react', 'react-dom'],
-          router: ['react-router-dom']
+          react: ['react', 'react-dom', 'react-router-dom'],
+          vendor: ['react-router-dom']
         }
       }
     }
   },
   resolve: {
     alias: {
-      '@': '/src'
+      '@': path.resolve(__dirname, 'src')
     }
   },
   // Ensure static file copying

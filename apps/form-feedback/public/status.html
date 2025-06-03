@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Husqvarna Forms - Page Status</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 20px auto;
+      padding: 20px;
+      line-height: 1.6;
+      color: #333;
+    }
+    h1 { color: #002F6C; }
+    .card {
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .status { font-weight: bold; }
+    .status.ok { color: green; }
+    .status.error { color: red; }
+    .status.warning { color: orange; }
+    button {
+      background-color: #002F6C;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-right: 10px;
+      margin-bottom: 10px;
+    }
+    button:hover {
+      background-color: #FF8200;
+    }
+    #results {
+      white-space: pre-wrap;
+      background-color: #f5f5f5;
+      padding: 15px;
+      border-radius: 4px;
+      max-height: 300px;
+      overflow: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>Husqvarna Forms Platform - Status Page</h1>
+  
+  <div class="card">
+    <h2>System Status</h2>
+    <p>Current URL: <span id="currentUrl"></span></p>
+    <p>Browser: <span id="browserInfo"></span></p>
+    <p>Network Status: <span id="networkStatus" class="status"></span></p>
+    <p>Date/Time: <span id="datetime"></span></p>
+  </div>
+  
+  <div class="card">
+    <h2>Connection Tests</h2>
+    <button onclick="testStaticResources()">Test Static Resources</button>
+    <button onclick="testRouting()">Test Routing</button>
+    <button onclick="testMainPageLoad()">Test Main Page Load</button>
+    <div id="results">Results will appear here...</div>
+  </div>
+  
+  <div class="card">
+    <h2>Quick Links</h2>
+    <button onclick="window.location.href='/se'">Swedish Form</button>
+    <button onclick="window.location.href='/en'">English Form</button>
+    <button onclick="window.location.href='/debug.html'">Debug Page</button>
+    <button onclick="window.location.href='/fallback.html'">Fallback Page</button>
+  </div>
+  
+  <script>
+    // Update basic system info
+    document.getElementById('currentUrl').textContent = window.location.href;
+    document.getElementById('browserInfo').textContent = navigator.userAgent;
+    document.getElementById('datetime').textContent = new Date().toLocaleString();
+    
+    // Check network connectivity
+    function updateNetworkStatus() {
+      const statusElement = document.getElementById('networkStatus');
+      if (navigator.onLine) {
+        statusElement.textContent = 'Online';
+        statusElement.className = 'status ok';
+      } else {
+        statusElement.textContent = 'Offline';
+        statusElement.className = 'status error';
+      }
+    }
+    
+    updateNetworkStatus();
+    window.addEventListener('online', updateNetworkStatus);
+    window.addEventListener('offline', updateNetworkStatus);
+    
+    // Function to log results
+    function log(message) {
+      const results = document.getElementById('results');
+      const timestamp = new Date().toLocaleTimeString();
+      results.textContent += `[${timestamp}] ${message}\n`;
+      results.scrollTop = results.scrollHeight;
+    }
+    
+    // Test static resources
+    async function testStaticResources() {
+      log('Testing static resources...');
+      
+      const resources = [
+        '/index.html',
+        '/assets/index.css',
+        'https://portal.husqvarnagroup.com/static/b2b/assets/with-name.4d5589ae.svg'
+      ];
+      
+      for (const resource of resources) {
+        try {
+          const response = await fetch(resource);
+          if (response.ok) {
+            log(`✅ ${resource}: OK (${response.status})`);
+          } else {
+            log(`❌ ${resource}: Failed (${response.status})`);
+          }
+        } catch (error) {
+          log(`❌ ${resource}: Error - ${error.message}`);
+        }
+      }
+      
+      log('Static resources test complete.');
+    }
+    
+    // Test routing
+    async function testRouting() {
+      log('Testing routing...');
+      
+      const routes = [
+        '/',
+        '/se',
+        '/en',
+        '/nonexistent'
+      ];
+      
+      for (const route of routes) {
+        try {
+          const response = await fetch(route);
+          const text = await response.text();
+          const hasRootDiv = text.includes('<div id="root"');
+          
+          log(`${route}: Status ${response.status}, Has root div: ${hasRootDiv ? 'Yes' : 'No'}`);
+        } catch (error) {
+          log(`❌ ${route}: Error - ${error.message}`);
+        }
+      }
+      
+      log('Routing test complete.');
+    }
+    
+    // Test main page load
+    function testMainPageLoad() {
+      log('Testing main page load in iframe...');
+      
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.onload = function() {
+        log('✅ Page loaded in iframe.');
+        setTimeout(() => {
+          try {
+            const hasRendered = iframe.contentDocument.querySelector('#root')?.childElementCount > 0;
+            log(`React rendered content: ${hasRendered ? 'Yes' : 'No'}`);
+            document.body.removeChild(iframe);
+          } catch (e) {
+            log(`❌ Error checking iframe content: ${e.message}`);
+            document.body.removeChild(iframe);
+          }
+        }, 2000);
+      };
+      iframe.onerror = function() {
+        log('❌ Error loading page in iframe.');
+        document.body.removeChild(iframe);
+      };
+      iframe.src = '/se';
+      document.body.appendChild(iframe);
+    }
+  </script>
+</body>
+</html>
