@@ -24,16 +24,6 @@
       "headers": {
         "Content-Type": "text/css"
       }
-    },
-    {
-      "route": "/se/*",
-      "rewrite": "/index.html",
-      "allowedRoles": ["anonymous"]
-    },
-    {
-      "route": "/en/*",
-      "rewrite": "/index.html",
-      "allowedRoles": ["anonymous"]
     }
   ],
   "navigationFallback": {
