@@ -19,8 +19,8 @@
     </script>
     <!-- Debug tools for production troubleshooting -->
     <script src="/debug-client.js" defer></script>
-    <!-- Allow Vite to inject the proper script during build -->
-    <script type="module" src="/src/main.tsx"></script>
+    <!-- Explicitly include the entry point for Vite to process -->
+    <script type="module" src="/src/main.new.tsx"></script>
   </head>
   <body>
     <div id="root"></div>

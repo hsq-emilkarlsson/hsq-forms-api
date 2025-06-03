@@ -1,0 +1,61 @@
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
+import './index.css';
+import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
+import localesRaw from './locales.json';
+import ErrorBoundary from './ErrorBoundary';
+
+// Type check locales
+const locales: Record<string, any> = localesRaw;
+
+// AppWithLang component that safely selects language based on URL parameter
+function AppWithLang() {
+  // Always call hooks at the top level
+  const params = useParams();
+  const { lang } = params;
+  
+  console.log("AppWithLang rendering, params:", params);
+  console.log("Lang param:", lang);
+  
+  // Safe language selection with fallback
+  const language = lang && locales[lang] ? lang : 'se';
+  console.log("Selected language:", language);
+  console.log("Translations available:", Object.keys(locales));
+  console.log("Using translations:", locales[language]);
+  
+  // Create diagnostic trace for debugging
+  const now = new Date().toISOString();
+  console.log(`[DIAGNOSTIC] AppWithLang rendered at ${now}, lang=${language}`);
+  
+  return <App lang={language} translations={locales[language]} />;
+}
+
+// Main rendering with error handling
+const rootElement = document.getElementById('root');
+if (!rootElement) {
+  console.error('Failed to find the root element. The app cannot be rendered.');
+  document.body.innerHTML = '<div style="color: red; padding: 20px;">Error: Root element not found</div>';
+} else {
+  try {
+    ReactDOM.createRoot(rootElement).render(
+      <React.StrictMode>
+        <ErrorBoundary>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<Navigate to="/se" replace />} />
+              <Route path=":lang" element={<AppWithLang />} />
+              <Route path="*" element={<Navigate to="/se" replace />} />
+            </Routes>
+          </BrowserRouter>
+        </ErrorBoundary>
+      </React.StrictMode>
+    );
+    console.log('React app successfully rendered');
+  } catch (error) {
+    console.error('Failed to render the React app:', error);
+    document.body.innerHTML = '<div style="color: red; padding: 20px;">Error: Failed to render the app. See console for details.</div>';
+  }
+}
+
+export {};

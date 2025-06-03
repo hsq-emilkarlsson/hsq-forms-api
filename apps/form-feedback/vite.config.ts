@@ -7,6 +7,8 @@ export default defineConfig({
   plugins: [react()],
   // Explicitly set base path to root for Azure SWA
   base: '/',
+  // Main entry point for the application
+  appType: 'spa', // Make sure Vite knows we're building an SPA
   server: {
     host: true,
     port: 3001, // Use 3001 for feedback form to avoid 5173 conflict
