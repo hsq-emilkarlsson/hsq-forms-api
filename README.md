@@ -1,23 +1,35 @@
-# 🚀 HSQ Forms Platform
+# 🚀 HSQ Forms Platform - Backend API
 
-> **Multi-frontend form system med centraliserad API backend**  
-> Byggd med React, FastAPI och deployed på Azure Container Apps
+> **Centralized FastAPI backend for HSQ form applications**  
+> Deployed on Azure Container Apps with Cosmos DB
 
 ![Deployment Status](https://img.shields.io/badge/Deployment-✅%20Live-success?style=for-the-badge)
 ![Azure](https://img.shields.io/badge/Azure-Container%20Apps-0078d4?style=for-the-badge&logo=microsoft-azure)
-![React](https://img.shields.io/badge/React-18-61dafb?style=for-the-badge&logo=react)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688?style=for-the-badge&logo=fastapi)
+![Python](https://img.shields.io/badge/Python-3.11+-3776ab?style=for-the-badge&logo=python)
 
-## 🌐 Live Production URLs
+## 🌐 Production API
 
 | Component | URL | Status |
 |-----------|-----|--------|
 | **🔗 API Backend** | [hsq-forms-api.agreeableglacier-1e56cfbb.westeurope.azurecontainerapps.io](https://hsq-forms-api.agreeableglacier-1e56cfbb.westeurope.azurecontainerapps.io) | ✅ Running |
-| **📝 Feedback Form** | [ca-hsq-feedback-form.agreeableglacier-1e56cfbb.westeurope.azurecontainerapps.io](https://ca-hsq-feedback-form.agreeableglacier-1e56cfbb.westeurope.azurecontainerapps.io) | ✅ Running |
-| **🎫 Support Form** | [hsq-forms-support.agreeableglacier-1e56cfbb.westeurope.azurecontainerapps.io](https://hsq-forms-support.agreeableglacier-1e56cfbb.westeurope.azurecontainerapps.io) | ✅ Running |
+| **📚 API Documentation** | [/docs](https://hsq-forms-api.agreeableglacier-1e56cfbb.westeurope.azurecontainerapps.io/docs) | ✅ Available |
 
-## 🏗️ Arkitektur
+## 🏗️ New Architecture (Frontend Separated)
 
+**This repository now contains ONLY the backend API.**  
+Frontend applications are in separate repositories for better isolation and deployment.
+
+```
+hsq-form-platform/              # 👈 This repo (Backend)
+├── apps/app/                   # FastAPI application
+├── infra/                      # Azure Bicep infrastructure
+└── docker/                    # Docker configurations
+
+# Separate repositories (to be created):
+hsq-feedback-form/              # React feedback form
+hsq-support-form/               # React support form  
+hsq-contact-form/               # React contact form
 ```
 HSQ Forms Platform
 ├── 🔗 API Backend (FastAPI)
