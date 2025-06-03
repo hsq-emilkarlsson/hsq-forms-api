@@ -17,8 +17,8 @@ interface Locales {
 
 const locales = localesRaw as Locales;
 
-// Language wrapper component
-function AppWithLang() {
+// Language wrapper component - exported for Fast Refresh
+export function AppWithLang() {
   const params = useParams<{ lang: string }>();
   const { lang } = params;
   

@@ -2,9 +2,13 @@ import { useState, useEffect } from 'react';
 import './App.css';
 import FileUpload, { type FileUploadResult } from './FileUpload';
 
+interface LocaleData {
+  [key: string]: string;
+}
+
 interface AppProps {
   lang: string;
-  translations: any;
+  translations: LocaleData;
 }
 
 // Interface för formulärdata
