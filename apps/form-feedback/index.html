@@ -7,35 +7,6 @@
     <meta name="description" content="Husqvarna Feedback Form" />
     <title>Husqvarna Feedback Form</title>
     <!-- No base href - rely on relative paths -->
-    <script>
-      // Immediate test script
-      console.log('=== HTML SCRIPT RUNNING ===');
-      document.addEventListener('DOMContentLoaded', function() {
-        console.log('=== DOM LOADED ===');
-        const rootEl = document.getElementById('root');
-        if (rootEl) {
-          rootEl.style.background = 'lime';
-          rootEl.innerHTML = '<h1 style="color: black; padding: 20px;">HTML SCRIPT WORKING - WAITING FOR REACT...</h1>';
-          console.log('=== ROOT ELEMENT FOUND AND STYLED ===');
-        } else {
-          console.error('=== NO ROOT ELEMENT FOUND ===');
-          document.body.innerHTML = '<h1 style="color: red;">NO ROOT ELEMENT!</h1>';
-        }
-      });
-      
-      // Add global error handling
-      window.addEventListener('error', function(e) {
-        console.error('Global error caught:', e.error || e.message);
-        const rootEl = document.getElementById('root');
-        if (rootEl && (!rootEl.innerHTML || rootEl.innerHTML.trim() === '')) {
-          rootEl.innerHTML = '<div style="color: red; padding: 20px; text-align: center;">' +
-            '<h2>Something went wrong</h2>' +
-            '<p>Please try reloading the page. If the problem persists, please contact support.</p>' +
-            '<button onclick="window.location.reload()" style="background: #002F6C; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer;">Reload Page</button>' +
-            '</div>';
-        }
-      });
-    </script>
     <script type="module" src="/src/main.tsx"></script>
   </head>
   <body>

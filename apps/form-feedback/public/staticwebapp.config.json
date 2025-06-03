@@ -1,9 +1,30 @@
 {
-  "navigationFallback": {
-    "rewrite": "/index.html",
-    "exclude": ["/static/images/*.{png,jpg,gif}", "/static/css/*"]
-  },
   "routes": [
+    {
+      "route": "/assets/*",
+      "allowedRoles": ["anonymous"]
+    },
+    {
+      "route": "/*.js",
+      "allowedRoles": ["anonymous"],
+      "headers": {
+        "Content-Type": "application/javascript"
+      }
+    },
+    {
+      "route": "/*.mjs",
+      "allowedRoles": ["anonymous"],
+      "headers": {
+        "Content-Type": "application/javascript"
+      }
+    },
+    {
+      "route": "/*.css",
+      "allowedRoles": ["anonymous"],
+      "headers": {
+        "Content-Type": "text/css"
+      }
+    },
     {
       "route": "/se/*",
       "rewrite": "/index.html",
@@ -13,13 +34,12 @@
       "route": "/en/*",
       "rewrite": "/index.html",
       "allowedRoles": ["anonymous"]
-    },
-    {
-      "route": "/*",
-      "rewrite": "/index.html",
-      "allowedRoles": ["anonymous"]
     }
   ],
+  "navigationFallback": {
+    "rewrite": "/index.html",
+    "exclude": ["/assets/*", "/*.js", "/*.mjs", "/*.css", "/*.json", "/*.svg", "/*.ico"]
+  },
   "responseOverrides": {
     "404": {
       "rewrite": "/index.html",
@@ -30,8 +50,11 @@
     "content-security-policy": "default-src 'self' 'unsafe-inline' 'unsafe-eval' https://portal.husqvarnagroup.com; img-src 'self' data: https://portal.husqvarnagroup.com; connect-src 'self' https://*.azurestaticapps.net https://*.azurecontainerapps.io;"
   },
   "mimeTypes": {
-    ".json": "text/json",
+    ".js": "application/javascript",
+    ".mjs": "application/javascript", 
+    ".css": "text/css",
+    ".json": "application/json",
     ".html": "text/html",
-    ".js": "application/javascript"
+    ".svg": "image/svg+xml"
   }
 }
