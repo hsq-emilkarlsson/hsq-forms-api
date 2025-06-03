@@ -62,7 +62,15 @@ button:focus-visible {
   a:hover {
     color: #747bff;
   }
-  button {
-    background-color: #f9f9f9;
+  /* Override any potential button styling from browser defaults */
+  .husqvarna-form button,
+  form button,
+  button.submit-button {
+    background-color: #002F6C !important;
+    color: #fff !important;
+    padding: 12px 20px !important;
+    font-size: 1rem !important;
+    min-height: 48px !important;
+    width: 100% !important;
   }
 }

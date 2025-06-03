@@ -2,6 +2,11 @@ import { useState } from 'react';
 import './App.css';
 import FileUpload, { type FileUploadResult } from './FileUpload';
 
+interface AppProps {
+  lang: string;
+  translations: any;
+}
+
 // Interface för formulärdata
 interface FormData {
   name: string;
@@ -19,7 +24,7 @@ interface ApiResponse {
   errors?: string[];
 }
 
-function App() {
+function App({ lang, translations }: AppProps) {
   const [formData, setFormData] = useState<FormData>({
     name: '',
     email: '',
@@ -60,19 +65,19 @@ function App() {
     // Frontendvalidering
     const newErrors: string[] = [];
     if (!formData.name.trim()) {
-      newErrors.push('Namn måste anges.');
+      newErrors.push(translations.validation.name);
     }
     // Enkel e-postvalidering
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!formData.email.trim() || !emailRegex.test(formData.email)) {
-      newErrors.push('Ange en giltig e-postadress.');
+      newErrors.push(translations.validation.email);
     }
     if (!formData.message || formData.message.trim().length < 10) {
-      newErrors.push('Meddelandet måste vara minst 10 tecken.');
+      newErrors.push(translations.validation.message);
     }
     if (newErrors.length > 0) {
       setErrors(newErrors);
-      setStatus('Vänligen rätta till felen ovan.');
+      setStatus(translations.error);
       setIsSubmitting(false);
       return;
     }
@@ -101,7 +106,7 @@ function App() {
       const result = await res.json() as ApiResponse;
       
       if (result.status === 'success') {
-        setStatus(result.message || 'Formuläret har skickats!');
+        setStatus(translations.success);
         setSubmissionId(result.submission_id || null);
         setShowFileUpload(true);
         // Rensa formuläret vid lyckad sändning
@@ -109,13 +114,13 @@ function App() {
           name: '',
           email: '',
           message: '',
-          form_type: 'contact' // Återställ till 'contact' vid rensning
+          form_type: 'contact'
         });
       } else {
         // Förbättrad felhantering: visa backend-meddelande och logga allt
         console.error('API error response:', result);
-        setStatus(result.message || 'Ett fel uppstod.');
-        setErrors(result.errors && result.errors.length > 0 ? result.errors : [result.message || 'Okänt fel']);
+        setStatus(result.message || translations.error);
+        setErrors(result.errors && result.errors.length > 0 ? result.errors : [result.message || translations.error]);
       }
     } catch (err) {
       console.error('Fel vid skickning:', err);
@@ -127,106 +132,131 @@ function App() {
   };
 
   return (
-    <div className="form-container">
-      <header className="app-header">
-        <h1>Feedback Input Form</h1>
-        <p>Vi uppskattar din feedback! Fyll i formuläret nedan.</p>
-      </header>
-      <form onSubmit={handleSubmit}>
-        <div className="form-group">
-          <label htmlFor="name">Namn:</label>
-          <input
-            type="text"
-            id="name"
-            name="name"
-            value={formData.name}
-            onChange={handleChange}
-            required
-            disabled={isSubmitting}
-            minLength={2}
-            placeholder="Ditt namn"
+    <div className="husqvarna-bg">
+      <div className="form-container husqvarna-form">
+        <div className="logo-wrapper">
+          <img
+            src="https://portal.husqvarnagroup.com/static/b2b/assets/with-name.4d5589ae.svg"
+            alt="Husqvarna logo"
+            className="husqvarna-logo"
           />
         </div>
-        <div className="form-group">
-          <label htmlFor="email">E-post:</label>
-          <input
-            type="email"
-            id="email"
-            name="email"
-            value={formData.email}
-            onChange={handleChange}
-            required
-            disabled={isSubmitting}
-            placeholder="namn@exempel.se"
-            pattern="^[^\s@]+@[^\s@]+\.[^\s@]+$"
-            autoComplete="email"
-          />
-        </div>
-        <div className="form-group">
-          <label htmlFor="message">Meddelande:</label>
-          <textarea
-            id="message"
-            name="message"
-            value={formData.message}
-            onChange={handleChange}
-            required
-            disabled={isSubmitting}
-            rows={5}
-            minLength={10}
-            placeholder="Skriv ditt meddelande här (minst 10 tecken)"
-          />
-        </div>
-        {showFileUpload && (
-          <div className="file-upload-section">
-            <h2>Bifoga filer (valfritt)</h2>
-            <p>Du kan bifoga filer till din förfrågan. Tillåtna filtyper: bilder, PDF, Word, Excel, textfiler.</p>
-            <FileUpload
-              submissionId={submissionId || undefined}
-              onFilesUploaded={handleFilesUploaded}
-              maxFiles={5}
-              maxSizePerFile={10 * 1024 * 1024} // 10MB
-              temporaryUploads={true}
+        <header className="app-header">
+          <h1>{translations.title}</h1>
+          <p>{translations.subtitle}</p>
+        </header>
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label htmlFor="name">{translations.name}</label>
+            <input
+              type="text"
+              id="name"
+              name="name"
+              value={formData.name}
+              onChange={handleChange}
+              required
+              disabled={isSubmitting}
+              minLength={2}
+              placeholder={translations.name}
             />
-            {uploadResults.length > 0 && (
-              <div className="upload-results">
-                <h3>Uppladdningsresultat:</h3>
-                <ul>
-                  {uploadResults.map((result, index) => (
-                    <li key={index} className={result.success ? 'success' : 'error'}>
-                      {result.original_filename}: {result.message}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {uploadedFiles.length > 0 && (
-              <div className="uploaded-files">
-                <h3>Uppladdade filer:</h3>
-                <ul>
-                  {uploadedFiles.map((file, index) => (
-                    <li key={index}>{file.original_filename}</li>
-                  ))}
-                </ul>
-              </div>
+          </div>
+          <div className="form-group">
+            <label htmlFor="email">{translations.email}</label>
+            <input
+              type="email"
+              id="email"
+              name="email"
+              value={formData.email}
+              onChange={handleChange}
+              required
+              disabled={isSubmitting}
+              placeholder="namn@exempel.se"
+              pattern="^[^\s@]+@[^\s@]+\.[^\s@]+$"
+              autoComplete="email"
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="message">{translations.message}</label>
+            <textarea
+              id="message"
+              name="message"
+              value={formData.message}
+              onChange={handleChange}
+              required
+              disabled={isSubmitting}
+              rows={5}
+              minLength={10}
+              placeholder={translations.messagePlaceholder}
+            />
+          </div>
+          {showFileUpload && (
+            <div className="file-upload-section">
+              <h2>{translations.attachFiles}</h2>
+              <p>{translations.attachFilesDesc}</p>
+              <FileUpload
+                submissionId={submissionId || undefined}
+                onFilesUploaded={handleFilesUploaded}
+                maxFiles={5}
+                maxSizePerFile={10 * 1024 * 1024}
+                temporaryUploads={true}
+              />
+              {uploadResults.length > 0 && (
+                <div className="upload-results">
+                  <h3>Uppladdningsresultat:</h3>
+                  <ul>
+                    {uploadResults.map((result, index) => (
+                      <li key={index} className={result.success ? 'success' : 'error'}>
+                        {result.original_filename}: {result.message}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {uploadedFiles.length > 0 && (
+                <div className="uploaded-files">
+                  <h3>Uppladdade filer:</h3>
+                  <ul>
+                    {uploadedFiles.map((file, index) => (
+                      <li key={index}>{file.original_filename}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+          <button 
+            type="submit" 
+            disabled={isSubmitting} 
+            className="submit-button"
+            style={{ 
+              backgroundColor: '#002F6C', 
+              color: '#fff',
+              padding: '12px 20px', 
+              width: '100%',
+              fontSize: '1rem', 
+              fontWeight: 600,
+              borderRadius: '6px',
+              minHeight: '48px',
+              border: 'none',
+              marginTop: '24px'
+            }} // Fullständiga inline-styles för att säkerställa korrekt rendering
+          >
+            {isSubmitting ? translations.submitting : translations.submit}
+          </button>
+        </form>
+        {status && (
+          <div className={`status-message ${errors.length > 0 ? 'error' : 'success'}`}>
+            <p>{status}</p>
+            {errors.length > 0 && (
+              <ul className="error-list">
+                {errors.map((error, index) => (
+                  <li key={index}>{error}</li>
+                ))}
+              </ul>
             )}
           </div>
         )}
-        <button type="submit" disabled={isSubmitting} style={{ marginTop: 24, width: '100%' }}>
-          {isSubmitting ? 'Skickar...' : 'Skicka'}
-        </button>
-      </form>
-      {status && (
-        <div className={`status-message ${errors.length > 0 ? 'error' : 'success'}`}>
-          <p>{status}</p>
-          {errors.length > 0 && (
-            <ul className="error-list">
-              {errors.map((error, index) => (
-                <li key={index}>{error}</li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
+      </div>
     </div>
   );
 }
