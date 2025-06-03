@@ -6,7 +6,9 @@ export default defineConfig({
   plugins: [react()],
   server: {
     host: true,
-    port: 3001 // Use 3001 for feedback form to avoid 5173 conflict
+    port: 3001, // Use 3001 for feedback form to avoid 5173 conflict
+    // Add history API fallback for SPA routing
+    historyApiFallback: true
   },
   build: {
     outDir: 'dist',
