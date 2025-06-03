@@ -1,6 +1,20 @@
 {
   "routes": [
     {
+      "route": "/main.js",
+      "headers": {
+        "Cache-Control": "no-cache",
+        "Content-Type": "application/javascript; charset=utf-8"
+      }
+    },
+    {
+      "route": "/entry.js",
+      "headers": {
+        "Cache-Control": "no-cache",
+        "Content-Type": "application/javascript; charset=utf-8"
+      }
+    },
+    {
       "route": "/*.js",
       "headers": {
         "Cache-Control": "public, max-age=31536000",
@@ -81,6 +95,19 @@
     ".css": "text/css",
     ".json": "application/json",
     ".html": "text/html",
-    ".svg": "image/svg+xml"
-  }
+    ".svg": "image/svg+xml",
+    ".tsx": "text/plain",
+    ".ts": "text/plain"
+  },
+  "platformErrorOverrides": [
+    {
+      "errorType": "NotFound",
+      "serve": "/index.html"
+    },
+    {
+      "errorType": "Unauthorized",
+      "serve": "/index.html",
+      "statusCode": 200
+    }
+  ]
 }

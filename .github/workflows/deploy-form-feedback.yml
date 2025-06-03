@@ -54,7 +54,31 @@ jobs:
         working-directory: ${{ env.APP_LOCATION }}
         run: |
           echo "Starting build process..."
-          npm run build
+          
+          # Clean any previous build artifacts
+          rm -rf dist
+          
+          # Ensure the correct entry point files exist
+          if [ ! -f "src/main.tsx" ]; then
+            echo "ERROR: Missing required entry point file src/main.tsx"
+            exit 1
+          fi
+          
+          if [ ! -f "index.html" ]; then
+            echo "ERROR: Missing required index.html file"
+            exit 1
+          fi
+          
+          # Build the application
+          VITE_DEBUG=true npm run build
+          
+          # Extra check for invalid file references
+          if grep -r "src/main" dist; then
+            echo "WARNING: Found references to source files in build output"
+          else
+            echo "✅ No direct references to source files found in build output (good!)"
+          fi
+          
           echo "Build completed successfully."
       - name: Verify build output
         working-directory: ${{ env.APP_LOCATION }}
@@ -112,6 +136,16 @@ jobs:
             else
               echo "WARNING: routes.json may not have JavaScript MIME type set correctly"
             fi
+          fi
+          
+          # Critical check: Make sure no .tsx files are referenced directly
+          echo "Checking for direct .tsx references in build output..."
+          if grep -r "\.tsx" ${{ env.OUTPUT_LOCATION }}; then
+            echo "⛔ ERROR: Found direct references to .tsx files in the build output!"
+            echo "This will cause white screen issues in production."
+            exit 1
+          else
+            echo "✅ No direct references to .tsx files found in build output"
           fi
 
       - name: Deploy to Azure Static Web Apps
