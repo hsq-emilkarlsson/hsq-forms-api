@@ -33,6 +33,7 @@ function App({ lang, translations }: AppProps) {
     metadata: {
       source: 'web',
       page: window.location.pathname,
+      language: lang, // Använder lang-parametern för att spara det valda språket i metadata
     }
   });
 
