@@ -1,6 +1,14 @@
 {
   "routes": [
     {
+      "route": "/assets/*.js",
+      "headers": { "Content-Type": "application/javascript" }
+    },
+    {
+      "route": "/assets/*.css",
+      "headers": { "Content-Type": "text/css" }
+    },
+    {
       "route": "/en/*",
       "serve": "/index.html",
       "statusCode": 200,
@@ -13,7 +21,7 @@
       "headers": { "Content-Type": "text/html" }
     },
     {
-      "route": "/*",
+      "route": "/",
       "serve": "/index.html",
       "statusCode": 200,
       "headers": { "Content-Type": "text/html" }

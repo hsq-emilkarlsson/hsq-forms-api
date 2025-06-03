@@ -4,6 +4,8 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  // Explicitly set base path to root
+  base: '/',
   server: {
     host: true,
     port: 3001, // Use 3001 for feedback form to avoid 5173 conflict
