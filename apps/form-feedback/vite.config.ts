@@ -19,11 +19,6 @@ export default defineConfig({
       },
     },
     rollupOptions: {
-      input: {
-        main: './index.html',
-        debug: './public/debug.html',
-        fallback: './public/fallback.html'
-      },
       output: {
         manualChunks: {
           react: ['react', 'react-dom'],
