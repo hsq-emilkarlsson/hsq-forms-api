@@ -1,4 +1,4 @@
-# HSQ Forms Platform – Azure Deployment Guide
+# HSQ Forms API – Azure Deployment Guide
 
 Senast uppdaterad: 2025-06-02
 

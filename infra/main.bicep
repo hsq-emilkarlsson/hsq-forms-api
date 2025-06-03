@@ -1,11 +1,11 @@
-// main.bicep - HSQ Forms Platform core infrastructure
+// main.bicep - HSQ Forms API core infrastructure
 // This Bicep file provisions the core Azure resources for the platform
 // - Resource Group, Container Registry, PostgreSQL, Log Analytics, Container Apps (API, Feedback, Support)
 // - Uses managed identity and secure best practices
 
 param location string = 'westeurope'
 param environment string = 'production'
-param projectName string = 'hsq-forms-platform'
+param projectName string = 'hsq-forms-api'
 param acrName string = 'hsqformsacr${uniqueString(resourceGroup().id)}'
 param dbName string = 'formdb'
 param dbUser string = 'formuser'

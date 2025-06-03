@@ -94,8 +94,8 @@ async def startup():
 def read_root():
     environment = os.getenv("ENVIRONMENT", "development")
     return {
-        "message": "Välkommen till Husqvarna Forms API",
-        "description": "Centraliserad API för alla formulär och frontend-applikationer",
+        "message": "Välkommen till HSQ Forms API",
+        "description": "Centraliserad API för formulärhantering och filuppladdningar",
         "environment": environment,
         "version": "1.0.0",
         "docs": "/docs",
