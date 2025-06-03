@@ -1,0 +1,37 @@
+{
+  "navigationFallback": {
+    "rewrite": "/index.html",
+    "exclude": ["/static/images/*.{png,jpg,gif}", "/static/css/*"]
+  },
+  "routes": [
+    {
+      "route": "/se/*",
+      "rewrite": "/index.html",
+      "allowedRoles": ["anonymous"]
+    },
+    {
+      "route": "/en/*",
+      "rewrite": "/index.html",
+      "allowedRoles": ["anonymous"]
+    },
+    {
+      "route": "/*",
+      "rewrite": "/index.html",
+      "allowedRoles": ["anonymous"]
+    }
+  ],
+  "responseOverrides": {
+    "404": {
+      "rewrite": "/index.html",
+      "statusCode": 200
+    }
+  },
+  "globalHeaders": {
+    "content-security-policy": "default-src 'self' 'unsafe-inline' 'unsafe-eval' https://portal.husqvarnagroup.com; img-src 'self' data: https://portal.husqvarnagroup.com; connect-src 'self' https://*.azurestaticapps.net https://*.azurecontainerapps.io;"
+  },
+  "mimeTypes": {
+    ".json": "text/json",
+    ".html": "text/html",
+    ".js": "application/javascript"
+  }
+}

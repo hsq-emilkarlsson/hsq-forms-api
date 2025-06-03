@@ -7,5 +7,10 @@ export default defineConfig({
   server: {
     host: true,
     port: 3001 // Use 3001 for feedback form to avoid 5173 conflict
+  },
+  build: {
+    outDir: 'dist',
+    emptyOutDir: true,
+    sourcemap: true
   }
 });

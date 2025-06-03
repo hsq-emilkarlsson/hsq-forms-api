@@ -16,7 +16,8 @@ function AppWithLang() {
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <BrowserRouter>
+    {/* Use BrowserRouter med explicit basename="" för att förhindra routingproblem */}
+    <BrowserRouter basename="">
       <Routes>
         <Route path="/" element={<Navigate to="/se" replace />} />
         <Route path=":lang" element={<AppWithLang />} />

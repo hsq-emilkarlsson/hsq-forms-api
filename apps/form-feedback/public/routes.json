@@ -3,17 +3,20 @@
     {
       "route": "/en/*",
       "serve": "/index.html",
-      "statusCode": 200
+      "statusCode": 200,
+      "headers": { "Content-Type": "text/html" }
     },
     {
       "route": "/se/*",
       "serve": "/index.html",
-      "statusCode": 200
+      "statusCode": 200,
+      "headers": { "Content-Type": "text/html" }
     },
     {
       "route": "/*",
       "serve": "/index.html",
-      "statusCode": 200
+      "statusCode": 200,
+      "headers": { "Content-Type": "text/html" }
     }
   ],
   "platformErrorOverrides": [
