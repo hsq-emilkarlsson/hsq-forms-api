@@ -19,11 +19,10 @@
     </script>
     <!-- Debug tools for production troubleshooting -->
     <script src="/debug-client.js" defer></script>
-    <!-- Explicit entry point that will be processed by Vite -->
-    <script type="module" src="/src/main.tsx"></script>
   </head>
   <body>
     <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
     <!-- Debug information will be displayed here if JS fails to load -->
     <div id="debug-info" style="display: none; margin-top: 20px; padding: 20px; background-color: #fff3f3; border: 1px solid #ffcccb;">
       <h3>Debug Information</h3>

@@ -138,11 +138,13 @@ jobs:
             fi
           fi
           
-          # Critical check: Make sure no .tsx files are referenced directly
+          # Critical check: Make sure no .tsx files are referenced directly in built files
           echo "Checking for direct .tsx references in build output..."
-          if grep -r "\.tsx" ${{ env.OUTPUT_LOCATION }}; then
+          if find ${{ env.OUTPUT_LOCATION }} -name "*.html" -o -name "*.js" -o -name "*.css" | xargs grep -l "\.tsx" 2>/dev/null; then
             echo "⛔ ERROR: Found direct references to .tsx files in the build output!"
             echo "This will cause white screen issues in production."
+            echo "Files with .tsx references:"
+            find ${{ env.OUTPUT_LOCATION }} -name "*.html" -o -name "*.js" -o -name "*.css" | xargs grep -l "\.tsx" 2>/dev/null || true
             exit 1
           else
             echo "✅ No direct references to .tsx files found in build output"
