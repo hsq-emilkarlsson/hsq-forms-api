@@ -1,0 +1,43 @@
+{
+  "translation": {
+    "common": {
+      "submit": "Skicka",
+      "cancel": "Avbryt",
+      "back": "Tillbaka",
+      "next": "Nästa",
+      "loading": "Laddar...",
+      "required": "Obligatoriskt fält",
+      "error": "Fel"
+    },
+    "form": {
+      "title": "Kontaktformulär",
+      "description": "Fyll i formuläret nedan för att skicka din förfrågan. Vi återkommer så snart som möjligt.",
+      "name": "Namn",
+      "email": "E-post",
+      "message": "Meddelande",
+      "phone": "Telefon",
+      "subject": "Ämne",
+      "submit": "Skicka",
+      "submitting": "Skickar...",
+      "waitWhileSubmitting": "Vänligen vänta medan formuläret skickas",
+      "consentText": "Jag godkänner att mina uppgifter behandlas enligt",
+      "privacyPolicy": "integritetspolicyn",
+      "success": "Formuläret har skickats",
+      "error": "Ett fel uppstod när formuläret skulle skickas",
+      "unexpectedError": "Ett oväntat fel uppstod. Försök igen senare.",
+      "validation": {
+        "required": "Detta fält är obligatoriskt",
+        "email": "Ange en giltig e-postadress",
+        "minLength": "Ange minst {{count}} tecken",
+        "maxLength": "Ange högst {{count}} tecken",
+        "pattern": "Ange ett giltigt värde"
+      }
+    },
+    "nav": {
+      "home": "Hem",
+      "forms": "Formulär",
+      "contact": "Kontakt",
+      "language": "Språk"
+    }
+  }
+}
