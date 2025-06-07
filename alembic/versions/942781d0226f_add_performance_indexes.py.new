@@ -1,0 +1,84 @@
+"""add_performance_indexes
+
+Revision ID: 942781d0226f
+Revises: 4a8b9c0d1e2f
+Create Date: 2025-06-04 07:59:52.563546
+
+"""
+from typing import Sequence, Union
+
+from alembic import op
+import sqlalchemy as sa
+
+
+# revision identifiers, used by Alembic.
+revision: str = '942781d0226f'
+down_revision: Union[str, None] = '4a8b9c0d1e2f'
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+def upgrade() -> None:
+    # Add indexes for better query performance
+    from sqlalchemy.exc import ProgrammingError
+    
+    # Helper function to safely create an index if it doesn't exist
+    def create_index_if_not_exists(index_name, table_name, columns, **kwargs):
+        try:
+            op.create_index(index_name, table_name, columns, **kwargs)
+        except ProgrammingError as e:
+            # Check if error is about duplicate index/relation
+            if 'relation' in str(e) and 'already exists' in str(e):
+                print(f"Index {index_name} already exists, skipping.")
+            else:
+                # Re-raise if it's a different error
+                raise
+    
+    # Form submissions indexes
+    create_index_if_not_exists('idx_form_submissions_form_type', 'form_submissions', ['form_type'])
+    create_index_if_not_exists('idx_form_submissions_created_at', 'form_submissions', ['created_at'])
+    create_index_if_not_exists('idx_form_submissions_is_processed', 'form_submissions', ['is_processed'])
+    create_index_if_not_exists('idx_form_submissions_email', 'form_submissions', ['email'])
+    
+    # Form templates indexes
+    create_index_if_not_exists('idx_form_templates_project_id', 'form_templates', ['project_id'])
+    create_index_if_not_exists('idx_form_templates_is_active', 'form_templates', ['is_active'], 
+                   postgresql_where=sa.text('is_active = true'))
+    create_index_if_not_exists('idx_form_templates_created_at', 'form_templates', ['created_at'])
+    create_index_if_not_exists('idx_form_templates_project_active', 'form_templates', ['project_id', 'is_active'])
+    
+    # Flexible form submissions indexes
+    create_index_if_not_exists('idx_flexible_submissions_template_id', 'flexible_form_submissions', ['template_id'])
+    create_index_if_not_exists('idx_flexible_submissions_created_at', 'flexible_form_submissions', ['created_at'])
+    create_index_if_not_exists('idx_flexible_submissions_project', 'flexible_form_submissions', ['submitted_from_project'])
+    create_index_if_not_exists('idx_flexible_submissions_processed', 'flexible_form_submissions', ['is_processed'])
+    create_index_if_not_exists('idx_flexible_submissions_template_date', 'flexible_form_submissions', ['template_id', 'created_at'])
+    
+    # File attachments indexes
+    create_index_if_not_exists('idx_file_attachments_submission_id', 'file_attachments', ['submission_id'])
+    create_index_if_not_exists('idx_file_attachments_status', 'file_attachments', ['upload_status'])
+    
+    # Flexible form attachments indexes
+    create_index_if_not_exists('idx_flexible_attachments_submission_id', 'flexible_form_attachments', ['submission_id'])
+    create_index_if_not_exists('idx_flexible_attachments_field_name', 'flexible_form_attachments', ['field_name'])
+
+
+def downgrade() -> None:
+    # Drop indexes in reverse order
+    op.drop_index('idx_flexible_attachments_field_name')
+    op.drop_index('idx_flexible_attachments_submission_id')
+    op.drop_index('idx_file_attachments_status')
+    op.drop_index('idx_file_attachments_submission_id')
+    op.drop_index('idx_flexible_submissions_template_date')
+    op.drop_index('idx_flexible_submissions_processed')
+    op.drop_index('idx_flexible_submissions_project')
+    op.drop_index('idx_flexible_submissions_created_at')
+    op.drop_index('idx_flexible_submissions_template_id')
+    op.drop_index('idx_form_templates_project_active')
+    op.drop_index('idx_form_templates_created_at')
+    op.drop_index('idx_form_templates_is_active')
+    op.drop_index('idx_form_templates_project_id')
+    op.drop_index('idx_form_submissions_email')
+    op.drop_index('idx_form_submissions_is_processed')
+    op.drop_index('idx_form_submissions_created_at')
+    op.drop_index('idx_form_submissions_form_type')

@@ -2,12 +2,26 @@
   "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
   "contentVersion": "1.0.0.0",
   "parameters": {
-    "location": { "value": "westeurope" },
-    "environment": { "value": "production" },
-    "projectName": { "value": "hsq-forms-platform" },
-    "dbPassword": { "value": "<REPLACE_WITH_SECURE_PASSWORD>" },
-    "feedbackAppName": { "value": "hsq-feedback-form" },
-    "supportAppName": { "value": "hsq-forms-support" },
-    "apiAppName": { "value": "hsq-forms-api" }
+    "environmentName": {
+      "value": "${AZURE_ENV_NAME}"
+    },
+    "location": {
+      "value": "${AZURE_LOCATION}"
+    },
+    "projectName": {
+      "value": "hsq-forms"
+    },
+    "dbAdminUsername": {
+      "value": "${DB_ADMIN_USERNAME}"
+    },
+    "dbAdminPassword": {
+      "value": "${DB_ADMIN_PASSWORD}"
+    },
+    "containerAppScale": {
+      "value": {
+        "minReplicas": 1,
+        "maxReplicas": 3
+      }
+    }
   }
 }

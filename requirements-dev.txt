@@ -1,0 +1,11 @@
+# Development requirements
+pytest==7.4.0
+pytest-cov==4.1.0
+pytest-asyncio==0.21.1
+black==23.7.0
+flake8==6.1.0
+mypy==1.5.1
+isort==5.12.0
+httpx==0.24.1  # For async HTTP client testing
+freezegun==1.2.2  # For time-dependent tests
+pytest-env==0.8.2  # For setting environment variables in tests
