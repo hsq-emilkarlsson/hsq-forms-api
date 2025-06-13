@@ -1,4 +1,4 @@
-.PHONY: setup setup-dev test test-cov format lint typecheck clean clean-all run-dev start-dev build-docker docker-compose docs migrate migrate-down migrate-create
+.PHONY: setup setup-dev test test-cov format lint typecheck clean clean-all deep-clean run-dev start-dev build-docker docker-compose docs migrate migrate-down migrate-create
 
 # Development setup
 setup:
@@ -62,6 +62,15 @@ clean-all: clean
 	@echo "Warning: This will remove all temporary uploads. Press Ctrl+C to cancel, or Enter to continue"
 	@read _
 	rm -rf uploads/temp/*
+
+# Deep clean - removes all temporary files and test databases
+deep-clean: clean-all
+	rm -f *.db
+	rm -f test*.db
+	find forms/ -name "node_modules" -type d -exec rm -rf {} + 2>/dev/null || true
+	find forms/ -name "dist" -type d -exec rm -rf {} + 2>/dev/null || true
+	find forms/ -name "package-lock.json" -delete 2>/dev/null || true
+	@echo "Deep clean completed - removed test databases and form build artifacts"
 
 # Docker commands
 build-docker:

@@ -21,5 +21,5 @@ docker-compose up --build
 # Scriptet når inte hit om docker-compose körs normalt (utan -d)
 # men tillgängligt om någon ändrar kommandot ovan till att köra i bakgrund
 echo "✅ HSQ Forms API är igång!"
-echo "API finns på: http://localhost:8001"
-echo "API-dokumentation: http://localhost:8001/docs"
+echo "API finns på: http://localhost:8000"
+echo "API-dokumentation: http://localhost:8000/docs"

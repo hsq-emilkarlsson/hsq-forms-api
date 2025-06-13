@@ -8,12 +8,12 @@ metadata:
 # Services configuration
 services:
   api:
-    project: ./apps/app
+    project: ./src
     language: python
     host: containerapp
     docker:
       path: ./Dockerfile
-      context: ./apps/app
+      context: .
       target: production
 
 # Azure resource deployment configuration

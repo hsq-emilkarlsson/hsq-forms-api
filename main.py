@@ -12,8 +12,8 @@ project_root = Path(__file__).parent.absolute()
 sys.path.insert(0, str(project_root))
 
 # Import and run the application
-from src.main import app
+from src.forms_api.app import app
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("src.main:app", host="0.0.0.0", port=8001, reload=True)
+    uvicorn.run("src.forms_api.app:app", host="0.0.0.0", port=8000, reload=True)

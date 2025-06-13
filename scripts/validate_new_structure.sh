@@ -44,7 +44,7 @@ sleep 10
 
 # Check if the application is running
 echo "🔍 Testing API health..."
-HEALTH_CHECK=$(curl -s http://localhost:8001/)
+HEALTH_CHECK=$(curl -s http://localhost:8000/)
 if [[ $HEALTH_CHECK == *"HSQ Forms API is running"* ]]; then
     echo "✅ API is running correctly"
 else
@@ -60,7 +60,7 @@ echo "🔍 Testing API endpoints..."
 
 # Test legacy form submission endpoint
 echo "- Testing legacy form submission..."
-LEGACY_ENDPOINT=$(curl -s -o /dev/null -w "%{http_code}" -X GET http://localhost:8001/submit)
+LEGACY_ENDPOINT=$(curl -s -o /dev/null -w "%{http_code}" -X GET http://localhost:8000/submit)
 if [ "$LEGACY_ENDPOINT" == "405" ] || [ "$LEGACY_ENDPOINT" == "200" ]; then
     echo "✅ Legacy endpoint is responding"
 else
@@ -72,7 +72,7 @@ fi
 
 # Test forms API endpoint
 echo "- Testing forms API..."
-FORMS_ENDPOINT=$(curl -s -o /dev/null -w "%{http_code}" -X GET http://localhost:8001/api/forms)
+FORMS_ENDPOINT=$(curl -s -o /dev/null -w "%{http_code}" -X GET http://localhost:8000/api/templates)
 if [ "$FORMS_ENDPOINT" == "404" ] || [ "$FORMS_ENDPOINT" == "405" ] || [ "$FORMS_ENDPOINT" == "200" ]; then
     echo "✅ Forms API endpoint is responding"
 else

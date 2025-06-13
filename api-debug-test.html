@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Debug Test</title>
+</head>
+<body>
+    <h1>HSQ Forms API Debug Test</h1>
+    <div id="results"></div>
+    
+    <script>
+    async function testAPI() {
+        const resultsDiv = document.getElementById('results');
+        resultsDiv.innerHTML = '<p>Testing API connection...</p>';
+        
+        try {
+            console.log('Making API request to localhost:8000...');
+            
+            const response = await fetch('http://localhost:8000/api/husqvarna/validate-customer?customer_number=1411768&customer_code=DOJ', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+            
+            console.log('Response status:', response.status);
+            console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+            
+            if (response.ok) {
+                const data = await response.json();
+                console.log('API Response:', data);
+                
+                resultsDiv.innerHTML = `
+                    <h2>✅ API Success!</h2>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+            } else {
+                resultsDiv.innerHTML = `
+                    <h2>❌ API Error!</h2>
+                    <p>Status: ${response.status}</p>
+                    <p>Response: ${await response.text()}</p>
+                `;
+            }
+        } catch (error) {
+            console.error('API Error:', error);
+            resultsDiv.innerHTML = `
+                <h2>❌ Network Error!</h2>
+                <p>Error: ${error.message}</p>
+                <p>Detta förklarar varför du får offline-validering!</p>
+            `;
+        }
+    }
+    
+    // Auto-run test
+    window.onload = testAPI;
+    </script>
+</body>
+</html>

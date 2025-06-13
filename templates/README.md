@@ -4,37 +4,46 @@ This directory contains templates for creating applications that use the HSQ For
 
 ## Available Templates
 
-- **form-app-template** - A React application with React Hook Form and TypeScript for creating forms that communicate with the HSQ Forms API. Features include:
-  - Contact forms with validation
-  - File upload handling
-  - Azure Blob Storage integration
-  - Multiple form components (basic, with files, dynamic)
-  - Complete deployment configuration for Azure Static Web Apps
+- **react-form-template** - A modern, containerized React application with:
+  - React Hook Form and Zod validation
+  - Multi-language support (Swedish, English, German)
+  - Tailwind CSS for styling
+  - Docker and docker-compose setup
+  - Complete development and production configuration
 
 ## Usage
 
-To use a template, copy the entire folder to a new project:
+To create a new form, copy the template to the `forms/` directory:
 
 ```bash
-cp -r templates/form-app-template /path/to/new-form-project
-cd /path/to/new-form-project
+# Create a new form based on the template
+cp -r templates/react-form-template forms/your-new-form-name
+cd forms/your-new-form-name
+
+# Install dependencies and start development
+npm install
+npm run dev
 ```
 
-Then follow the instructions in the template's own README.md file to get started.
+For production deployment:
 
-## Azure Integration
+```bash
+# Build and run with Docker
+docker-compose up --build
+```
 
-The form-app-template includes full Azure integration with:
+## Project Structure
 
-- Azure Static Web Apps deployment configuration
-- GitHub Actions CI/CD workflow
-- Azure Blob Storage integration for file uploads
-- Comprehensive deployment documentation in AZURE_DEPLOYMENT.md
+- `templates/` - Contains the base template for creating new forms
+- `forms/` - Contains all deployed form applications
+  - Each form is a separate containerized React application
+  - Forms communicate with the HSQ Forms API backend
 
 ## Customization
 
-Each template includes detailed documentation on how to customize it for your specific needs. See the following files in the form-app-template directory:
+Each form can be customized independently:
 
-- CUSTOMIZATION.md - How to customize forms and styling
-- INTEGRATION.md - How to integrate with the HSQ Forms API
-- DOCS.md - Complete documentation index
+- Update `src/components/Form.tsx` for form fields and validation
+- Modify translations in `src/i18n.js` for multi-language support
+- Adjust styling in Tailwind CSS classes
+- Configure API endpoints in `.env` file

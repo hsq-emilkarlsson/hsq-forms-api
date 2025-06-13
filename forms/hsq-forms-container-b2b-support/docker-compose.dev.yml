@@ -1,0 +1,40 @@
+services:
+  hsq-support-form:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3003:3000"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+      - NODE_ENV=development
+    volumes:
+      # Mount source code for live reload
+      - .:/app
+      - /app/node_modules
+      - /app/dist
+    networks:
+      - hsq-forms-network
+    # Override the default command for development
+    command: >
+      sh -c "npm run build && npm run start"
+    # Restart policy for development
+    restart: unless-stopped
+
+  # Production version (builds once, serves static files)
+  hsq-support-form-prod:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3004:3000"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+      - NODE_ENV=production
+    networks:
+      - hsq-forms-network
+    restart: unless-stopped
+
+networks:
+  hsq-forms-network:
+    external: true

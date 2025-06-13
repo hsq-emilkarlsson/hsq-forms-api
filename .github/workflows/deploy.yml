@@ -1,0 +1,185 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  REGISTRY_URL: ${{ secrets.REGISTRY_URL }}
+  IMAGE_NAME: hsq-forms-api
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_USER: testuser
+          POSTGRES_DB: testdb
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-dev.txt
+    
+    - name: Run tests
+      env:
+        DATABASE_URL: postgresql://testuser:testpass@localhost:5432/testdb
+        SECRET_KEY: test-secret-key
+      run: |
+        python -m pytest tests/ -v
+    
+    - name: Run linting
+      run: |
+        python -m flake8 src/ --max-line-length=100
+        python -m black --check src/
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY_URL }}
+        username: ${{ secrets.REGISTRY_USERNAME }}
+        password: ${{ secrets.REGISTRY_PASSWORD }}
+    
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY_URL }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=sha,prefix=sha-
+          type=raw,value=latest,enable={{is_default_branch}}
+    
+    - name: Build and push Docker image
+      id: build
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile.prod
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        platforms: linux/amd64,linux/arm64
+
+  deploy-staging:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Deploy to Staging
+      run: |
+        echo "Deploying to staging environment"
+        echo "Image: ${{ needs.build.outputs.image-tag }}"
+        # Add your staging deployment logic here
+        # This could be:
+        # - SSH to staging server and run deployment script
+        # - Use kubectl for Kubernetes deployment
+        # - Use Azure Container Instances
+        # - Use Docker Swarm
+    
+    - name: Run integration tests
+      run: |
+        echo "Running integration tests against staging"
+        # Add integration test commands here
+
+  deploy-production:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    environment: production
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Deploy to Production
+      run: |
+        echo "Deploying to production environment"
+        echo "Image: ${{ needs.build.outputs.image-tag }}"
+        # Add your production deployment logic here
+        
+        # Example for Azure Container Instances:
+        # az container create \
+        #   --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+        #   --name hsq-forms-api \
+        #   --image ${{ needs.build.outputs.image-tag }} \
+        #   --dns-name-label hsq-forms-api \
+        #   --ports 8000 \
+        #   --environment-variables \
+        #     ENVIRONMENT=production \
+        #     DATABASE_URL=${{ secrets.DATABASE_URL }} \
+        #   --secure-environment-variables \
+        #     SECRET_KEY=${{ secrets.SECRET_KEY }}
+    
+    - name: Health check
+      run: |
+        echo "Performing health check"
+        # Add health check logic here
+        # curl -f https://your-production-url/health
+
+  security-scan:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+    
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'

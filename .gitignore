@@ -12,6 +12,23 @@ venv.bak/
 .venv/
 *.egg-info/
 
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.npm
+.eslintcache
+.node_repl_history
+*.tgz
+.yarn-integrity
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
 # Environment variables
 .env
 .env.local
@@ -48,6 +65,12 @@ logs/
 # Azure
 .azure/
 *.bicep.backup
+
+# Temporary files
+/tmp/
+temp/
+*.tmp
+*.temp
 
 # Backups
 backups/

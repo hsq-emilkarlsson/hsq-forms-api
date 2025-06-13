@@ -4,8 +4,8 @@ Service-lager för formulärhantering
 import json
 from typing import Dict, Any, List, Optional
 from sqlalchemy.orm import Session
-from src.forms_api.models import FormTemplate, FlexibleFormSubmission
-from src.forms_api.schemas import FormTemplateCreate, FlexibleFormSubmissionCreate
+from src.forms_api.models import FormTemplate, FormSubmission
+from src.forms_api.schemas import FormTemplateCreate, FormSubmissionCreate
 import jsonschema
 from jsonschema import validate, ValidationError
 import asyncio
@@ -125,11 +125,11 @@ class FormBuilderService:
     @staticmethod
     def create_form_submission(
         db: Session, 
-        submission_data: FlexibleFormSubmissionCreate,
+        submission_data: FormSubmissionCreate,
         ip_address: Optional[str] = None,
         user_agent: Optional[str] = None,
         send_webhook: bool = True
-    ) -> FlexibleFormSubmission:
+    ) -> FormSubmission:
         """Skapa en ny formulärinlämning"""
         
         # Hämta template
@@ -147,13 +147,11 @@ class FormBuilderService:
             raise ValueError(f"Validation failed: {'; '.join(errors)}")
         
         # Skapa submission
-        submission = FlexibleFormSubmission(
+        submission = FormSubmission(
             template_id=submission_data.template_id,
             data=submission_data.data,
-            submitted_by=submission_data.submitted_by,
-            submitted_from_project=submission_data.submitted_from_project,
-            submitted_from_ip=ip_address,
-            user_agent=user_agent
+            submitted_from=submission_data.submitted_from,
+            ip_address=ip_address
         )
         
         db.add(submission)
@@ -196,15 +194,23 @@ class FormBuilderService:
         template_id: str, 
         limit: int = 20, 
         offset: int = 0
-    ) -> tuple[List[FlexibleFormSubmission], int]:
+    ) -> tuple[List[FormSubmission], int]:
         """Hämta submissions för en template"""
-        query = db.query(FlexibleFormSubmission).filter(
-            FlexibleFormSubmission.template_id == template_id
+        query = db.query(FormSubmission).filter(
+            FormSubmission.template_id == template_id
         )
         
         total = query.count()
         submissions = query.order_by(
-            FlexibleFormSubmission.created_at.desc()
+            FormSubmission.created_at.desc()
         ).limit(limit).offset(offset).all()
         
         return submissions, total
+    
+    @staticmethod
+    def list_templates(db: Session, project_id: Optional[str] = None) -> List[FormTemplate]:
+        """List all form templates, optionally filtered by project_id"""
+        query = db.query(FormTemplate).filter(FormTemplate.is_active == True)
+        if project_id:
+            query = query.filter(FormTemplate.project_id == project_id)
+        return query.order_by(FormTemplate.created_at.desc()).all()

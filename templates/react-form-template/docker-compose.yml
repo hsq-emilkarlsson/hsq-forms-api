@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  react-form-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:8001/api
+    volumes:
+      - .:/app
+    command: npm run dev

@@ -8,7 +8,7 @@ from sqlalchemy.orm import sessionmaker
 from src.forms_api.config import settings
 
 # Skapa SQLAlchemy engine
-engine = create_engine(settings.database_url)
+engine = create_engine(settings.effective_database_url)
 
 # Skapa sessionmaker
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

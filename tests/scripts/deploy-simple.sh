@@ -35,10 +35,8 @@ print_step "1. Logga in på Container Registry"
 az acr login --name $ACR_NAME
 
 print_step "2. Bygg och pusha Docker image"
-cd apps/app
 docker build -t $ACR_NAME.azurecr.io/$APP_NAME:latest .
 docker push $ACR_NAME.azurecr.io/$APP_NAME:latest
-cd ../..
 
 print_step "3. Uppdatera Container App"
 az containerapp update \

@@ -1,0 +1,87 @@
+{
+  "app": {
+    "subtitle": "B2B Supportportal",
+    "footer": "© 2025 Husqvarna Group. Alla rättigheter förbehållna."
+  },
+  "support": {
+    "title": "B2B Support",
+    "description": "Fyll i formuläret nedan för att få hjälp med dina Husqvarna-produkter. Vi återkommer inom 2-3 arbetsdagar.",
+    "sections": {
+      "customerInfo": "Kundinformation",
+      "caseDescription": "Ärendebeskrivning"
+    },
+    "customerInfo": "Kundinformation",
+    "caseDescription": "Ärendebeskrivning",
+    "supportType": "Typ av support",
+    "technical": "Teknisk support",
+    "technicalDesc": "Problem med produkter, installation eller tekniska frågor",
+    "customer": "Kundsupport",
+    "customerDesc": "Frågor om beställningar, leveranser eller fakturor",
+    "customerNumber": "Kundnummer",
+    "customerNumberPlaceholder": "Ange ditt kundnummer",
+    "email": "E-postadress",
+    "emailPlaceholder": "din.epost@foretag.se",
+    "companyName": "Företagsnamn",
+    "companyNamePlaceholder": "Ange företagsnamn",
+    "contactPerson": "Kontaktperson",
+    "contactPersonPlaceholder": "Förnamn Efternamn",
+    "phone": "Telefonnummer",
+    "phonePlaceholder": "+46 XX XXX XX XX",
+    "productInfo": "Produktinformation",
+    "pncNumber": "PNC-nummer",
+    "pncPlaceholder": "t.ex. 967 12 34-56",
+    "serialNumber": "Serienummer",
+    "serialPlaceholder": "t.ex. 12345678",
+    "productInfoNote": "Ange antingen PNC-nummer eller serienummer för att hjälpa oss identifiera din produkt.",
+    "subject": "Ämne",
+    "subjectPlaceholder": "Kort beskrivning av ditt ärende",
+    "problemDescription": "Problembeskrivning",
+    "problemPlaceholder": "Beskriv ditt problem eller din fråga så detaljerat som möjligt...",
+    "urgency": "Prioritet",
+    "urgencyLow": "Låg - Inom en vecka",
+    "urgencyMedium": "Normal - Inom 2-3 dagar",
+    "urgencyHigh": "Hög - Så snart som möjligt",
+    "attachments": "Bifogade filer",
+    "attachmentsNote": "Ladda upp relevanta filer (PDF, Word, bilder). Max 10MB per fil.",
+    "uploadPrompt": "Klicka för att ladda upp filer eller drag och släpp",
+    "selectedFiles": "Valda filer",
+    "remove": "Ta bort",
+    "submitting": "Skickar...",
+    "submit": "Skicka supportärende",
+    "validatingCustomer": "Validerar kundnummer...",
+    "customerValid": "Kundnummer giltigt",
+    "customerInvalid": "Ogiltigt kundnummer",
+    "customerValidationError": "Kunde inte validera kundnummer",
+    "customerValidationRequired": "Vänligen kontrollera att kundnumret är giltigt innan du skickar"
+  },
+  "validation": {
+    "supportTypeRequired": "Vänligen välj supporttyp",
+    "customerNumberRequired": "Kundnummer krävs",
+    "invalidEmail": "Ogiltig e-postadress",
+    "companyNameRequired": "Företagsnamn krävs",
+    "contactPersonRequired": "Kontaktperson krävs",
+    "subjectRequired": "Ämne krävs",
+    "problemDescriptionMinLength": "Problembeskrivning måste innehålla minst 10 tecken",
+    "pncOrSerialRequired": "För teknisk support krävs antingen PNC-nummer eller serienummer"
+  },
+  "errors": {
+    "networkError": "Kan inte ansluta till servern. Kontrollera din internetanslutning eller försök igen senare.",
+    "submissionFailed": "Inlämning misslyckades",
+    "unknownError": "Ett oväntat fel uppstod"
+  },
+  "form": {
+    "success": "Formuläret har skickats framgångsrikt! Vi återkommer inom 2-3 arbetsdagar.",
+    "error": "Ett fel uppstod vid skickning av formuläret. Vänligen försök igen.",
+    "submissionSuccess": "Ärende skapat framgångsrikt",
+    "submissionError": "Fel vid submission"
+  },
+  "language": {
+    "select": "Välj språk",
+    "swedish": "Svenska",
+    "english": "Engelska"
+  },
+  "navigation": {
+    "back": "Tillbaka",
+    "home": "Hem"
+  }
+}

@@ -47,7 +47,7 @@ class Settings(BaseSettings):
     api_redoc_url: str = "/redoc"
     
     # CORS settings
-    cors_origins: str = "*"
+    cors_origins: Union[List[str], str] = "*"
     cors_allow_credentials: bool = True
     cors_allow_methods: str = "GET,POST,PUT,DELETE,OPTIONS"
     cors_allow_headers: str = "Accept,Authorization,Content-Type,X-API-Key"
@@ -55,13 +55,17 @@ class Settings(BaseSettings):
     @validator("cors_origins", pre=True)
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> Union[List[str], str]:
         """Parse CORS origins from string to list if needed."""
-        if isinstance(v, str) and not v.startswith("["):
-            return [i.strip() for i in v.split(",")]
-        elif isinstance(v, (list, str)):
+        if isinstance(v, str):
+            if v == "*":
+                return v
+            if not v.startswith("["):
+                return [i.strip() for i in v.split(",")]
+        elif isinstance(v, list):
             return v
         raise ValueError("CORS_ORIGINS should be a comma-separated string or a list")
     
     # Database settings
+    database_url: Optional[str] = None
     postgres_db: str = "hsq_forms"
     postgres_user: str = "postgres"
     postgres_password: str = "password"
@@ -72,8 +76,10 @@ class Settings(BaseSettings):
     db_pool_timeout: int = 30
     
     @property
-    def database_url(self) -> str:
-        """Generate PostgreSQL connection string."""
+    def effective_database_url(self) -> str:
+        """Get the effective database URL - use DATABASE_URL if set, otherwise generate PostgreSQL URL."""
+        if self.database_url:
+            return self.database_url
         return f"postgresql://{self.postgres_user}:{self.postgres_password}@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
     
     # Storage settings
@@ -92,14 +98,16 @@ class Settings(BaseSettings):
     secret_key: str = "development_secret_key"
     access_token_expire_minutes: int = 60
     api_key_header_name: str = "X-API-Key"
-    allowed_api_keys: str = ""  # Comma-separated list of allowed API keys
+    allowed_api_keys: Union[str, List[str]] = ""  # Comma-separated list of allowed API keys
     
     @validator("allowed_api_keys", pre=True)
-    def parse_allowed_api_keys(cls, v: str) -> List[str]:
+    def parse_allowed_api_keys(cls, v: Union[str, List[str]]) -> Union[str, List[str]]:
         """Parse allowed API keys from string to list."""
-        if not v:
-            return []
-        return [key.strip() for key in v.split(",")]
+        if isinstance(v, str):
+            if not v:
+                return []
+            return [key.strip() for key in v.split(",")]
+        return v
     
     # Form submission settings
     max_attachment_size_mb: int = 10
@@ -140,6 +148,18 @@ class Settings(BaseSettings):
         except Exception as e:
             logger.warning(f"Failed to parse webhook_form_specific_urls: {e}")
             return {}
+    
+    # Husqvarna ESB Integration settings
+    husqvarna_esb_api_key: str = ""
+    husqvarna_esb_base_url: str = "https://api-qa.integration.husqvarnagroup.com/hqw170/v1"
+    husqvarna_esb_apac_customer_codes: str = ""  # Comma-separated list of APAC customer codes
+    
+    @property
+    def husqvarna_esb_apac_codes_list(self) -> List[str]:
+        """Convert APAC customer codes string to list."""
+        if not self.husqvarna_esb_apac_customer_codes:
+            return []
+        return [code.strip() for code in self.husqvarna_esb_apac_customer_codes.split(",")]
 
 @lru_cache()
 def get_settings() -> Settings:
@@ -157,6 +177,10 @@ def get_settings() -> Settings:
     return Settings()
 
 
+# Create a settings instance for direct import
+settings = get_settings()
+
+
 def get_environment() -> str:
     """
     Get the current environment.
@@ -164,6 +188,4 @@ def get_environment() -> str:
     Returns:
         str: The current environment (development, staging, production)
     """
-    return get_settings().environment
-    
-    logger.info(f"Logging configured for environment: {settings.environment}")
+    return settings.environment

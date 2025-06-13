@@ -1,0 +1,29 @@
+services:
+  hsq-forms-b2b-support:
+    image: hsq-forms-container-b2b-support:latest
+    container_name: hsq-forms-b2b-support
+    ports:
+      - "3003:3003"
+    networks:
+      - hsq-forms-network
+    environment:
+      # API Configuration - använd localhost för webbläsarens API-anrop (backend är port-mappad)
+      - VITE_API_URL=http://localhost:8000/api
+      - VITE_BACKEND_API_URL=http://localhost:8000
+      - VITE_HUSQVARNA_API_BASE_URL=https://api-qa.integration.husqvarnagroup.com/hqw170/v1
+      - VITE_HUSQVARNA_API_KEY=3d9c4d8a3c5c47f1a2a0ec096496a786
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3003/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    labels:
+      - "com.docker.compose.project=hsq-forms"
+      - "description=B2B Support Form with Husqvarna Group API Integration"
+      - "version=1.0.0"
+
+networks:
+  hsq-forms-network:
+    external: true
