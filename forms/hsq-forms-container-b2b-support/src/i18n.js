@@ -10,7 +10,7 @@ const resources = {
       },
       support: {
         title: 'Support Request',
-        description: 'Please fill out this form to submit a support request. We will process your request and get back to you within 2-3 business days.',
+        description: 'Please fill out this form to submit a support request.',
         supportType: 'Support Type',
         technical: 'Technical Support',
         technicalDesc: 'Product issues, technical problems',
@@ -18,6 +18,7 @@ const resources = {
         customerDesc: 'General inquiries, account issues',
         customerNumber: 'Customer Number',
         customerNumberPlaceholder: 'Enter your customer number',
+        customerInfo: 'Contact Information',
         email: 'Email Address',
         emailPlaceholder: 'Enter your email address',
         companyName: 'Company Name',
@@ -59,7 +60,7 @@ const resources = {
       },
     },
   },
-  se: {
+  sv: {
     translation: {
       app: {
         subtitle: 'B2B Supportportal',
@@ -67,7 +68,7 @@ const resources = {
       },
       support: {
         title: 'Supportförfrågan',
-        description: 'Vänligen fyll i detta formulär för att skicka en supportförfrågan. Vi kommer att behandla din förfrågan och återkomma inom 2-3 arbetsdagar.',
+        description: 'Vänligen fyll i detta formulär för att skicka en supportförfrågan.',
         supportType: 'Supporttyp',
         technical: 'Teknisk Support',
         technicalDesc: 'Produktproblem, tekniska frågor',
@@ -75,6 +76,8 @@ const resources = {
         customerDesc: 'Allmänna frågor, kontofrågor',
         customerNumber: 'Kundnummer',
         customerNumberPlaceholder: 'Ange ditt kundnummer',
+        customerInfo: 'Kontaktinformation',
+        caseDescription: 'Ärendebeskrivning',
         email: 'E-postadress',
         emailPlaceholder: 'Ange din e-postadress',
         companyName: 'Företagsnamn',
@@ -103,10 +106,18 @@ const resources = {
         remove: 'Ta bort',
         submit: 'Skicka supportförfrågan',
         submitting: 'Skickar...',
+        customerValidationRequired: 'Vänligen kontrollera att kundnumret är giltigt innan du skickar.',
       },
       form: {
         success: 'Supportförfrågan skickad framgångsrikt! Vi kontaktar dig snart.',
         error: 'Fel vid sändning av formulär. Försök igen.',
+      },
+      validation: {
+        supportTypeRequired: 'Vänligen välj supporttyp',
+        customerNumberRequired: 'Kundnummer krävs',
+        invalidEmail: 'Ogiltig e-postadress',
+        subjectRequired: 'Ämne krävs',
+        problemDescriptionRequired: 'Problembeskrivning krävs',
       },
       language: {
         select: 'Välj språk',
@@ -124,7 +135,7 @@ const resources = {
       },
       support: {
         title: 'Support-Anfrage',
-        description: 'Bitte füllen Sie dieses Formular aus, um eine Support-Anfrage zu stellen. Wir werden Ihre Anfrage bearbeiten und uns innerhalb von 2-3 Werktagen bei Ihnen melden.',
+        description: 'Bitte füllen Sie dieses Formular aus, um eine Support-Anfrage zu stellen.',
         supportType: 'Support-Typ',
         technical: 'Technischer Support',
         technicalDesc: 'Produktprobleme, technische Fragen',
@@ -132,6 +143,7 @@ const resources = {
         customerDesc: 'Allgemeine Anfragen, Kontoprobleme',
         customerNumber: 'Kundennummer',
         customerNumberPlaceholder: 'Geben Sie Ihre Kundennummer ein',
+        customerInfo: 'Kontaktinformationen',
         email: 'E-Mail-Adresse',
         emailPlaceholder: 'Geben Sie Ihre E-Mail-Adresse ein',
         companyName: 'Firmenname',
@@ -177,8 +189,8 @@ const resources = {
 
 i18n.use(initReactI18next).init({
   resources,
-  lng: 'en',
-  fallbackLng: 'en',
+  lng: 'sv',
+  fallbackLng: 'sv',
   interpolation: {
     escapeValue: false,
   },

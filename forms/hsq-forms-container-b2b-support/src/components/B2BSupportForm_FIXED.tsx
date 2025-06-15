@@ -221,7 +221,7 @@ const B2BSupportForm = () => {
         {t('support.title', 'B2B Support')}
       </h1>
       <p className="text-gray-600 mb-8">
-        {t('support.description', 'Fyll i formuläret nedan för att få hjälp med dina Husqvarna-produkter. Vi återkommer inom 2-3 arbetsdagar.')}
+        {t('support.description', 'Fyll i formuläret nedan för att få hjälp med dina Husqvarna-produkter.')}
       </p>
 
       {/* Status Messages */}

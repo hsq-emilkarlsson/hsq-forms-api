@@ -10,7 +10,7 @@ const resources = {
       },
       returns: {
         title: 'Product Return Request',
-        description: 'Please fill out this form to initiate a product return request. We will process your request and get back to you within 2-3 business days.',
+        description: 'Please fill out this form to initiate a product return request.',
         companyInfo: 'Company Information',
         companyName: 'Company Name',
         companyNamePlaceholder: 'Enter your company name',
@@ -68,7 +68,7 @@ const resources = {
       },
       returns: {
         title: 'Produktreturbegäran',
-        description: 'Vänligen fyll i detta formulär för att initiera en produktreturbegäran. Vi kommer att behandla din begäran och återkomma inom 2-3 arbetsdagar.',
+        description: 'Vänligen fyll i detta formulär för att initiera en produktreturbegäran.',
         companyInfo: 'Företagsinformation',
         companyName: 'Företagsnamn',
         companyNamePlaceholder: 'Ange ditt företagsnamn',
@@ -126,7 +126,7 @@ const resources = {
       },
       returns: {
         title: 'Produktrücksendungsantrag',
-        description: 'Bitte füllen Sie dieses Formular aus, um eine Produktrücksendung zu beantragen. Wir werden Ihren Antrag bearbeiten und uns innerhalb von 2-3 Werktagen bei Ihnen melden.',
+        description: 'Bitte füllen Sie dieses Formular aus, um eine Produktrücksendung zu beantragen.',
         companyInfo: 'Unternehmensinformation',
         companyName: 'Firmenname',
         companyNamePlaceholder: 'Geben Sie Ihren Firmennamen ein',

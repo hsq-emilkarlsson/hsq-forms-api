@@ -58,7 +58,7 @@ function FormPage() {
               {t('returns.title', 'Product Return Request')}
             </h2>
             <p className="text-gray-600">
-              {t('returns.description', 'Please fill out this form to initiate a product return request. We will process your request and get back to you within 2-3 business days.')}
+              {t('returns.description', 'Please fill out this form to initiate a product return request.')}
             </p>
           </div>
           

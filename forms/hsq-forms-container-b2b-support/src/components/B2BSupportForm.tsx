@@ -2,42 +2,38 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslation } from 'react-i18next';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
+
+const schema = z.object({
+  supportType: z.enum(['technical', 'customer'], {
+    required_error: 'Please select support type',
+  }),
+  customerNumber: z.string().min(1, 'Customer number is required'),
+  email: z.string().email('Invalid email address'),
+  phone: z.string().optional(),
+  // Technical support fields
+  pncNumber: z.string().optional(),
+  serialNumber: z.string().optional(),
+  // Problem description
+  subject: z.string().min(1, 'Subject is required'),
+  problemDescription: z.string().min(10, 'Problem description must be at least 10 characters'),
+  // File attachments
+  attachments: z.array(z.instanceof(File)).optional(),
+}).refine((data) => {
+  // If technical support is selected, require either PNC or Serial Number
+  if (data.supportType === 'technical') {
+    return data.pncNumber || data.serialNumber;
+  }
+  return true;
+}, {
+  message: 'For technical support, either PNC or Serial Number is required',
+  path: ['pncNumber'],
+});
+
+type FormData = z.infer<typeof schema>;
 
 const B2BSupportForm = () => {
   const { t } = useTranslation();
-  
-  // Create schema with translated error messages
-  const schema = useMemo(() => z.object({
-    supportType: z.enum(['technical', 'customer'], {
-      required_error: t('validation.supportTypeRequired', 'Please select support type'),
-    }),
-    customerNumber: z.string().min(1, t('validation.customerNumberRequired', 'Customer number is required')),
-    email: z.string().email(t('validation.invalidEmail', 'Invalid email address')),
-    companyName: z.string().min(1, t('validation.companyNameRequired', 'Company name is required')),
-    contactPerson: z.string().min(1, t('validation.contactPersonRequired', 'Contact person is required')),
-    phone: z.string().optional(),
-    // Technical support fields
-    pncNumber: z.string().optional(),
-    serialNumber: z.string().optional(),
-    // Problem description
-    subject: z.string().min(1, t('validation.subjectRequired', 'Subject is required')),
-    problemDescription: z.string().min(10, t('validation.problemDescriptionMinLength', 'Problem description must be at least 10 characters')),
-    urgency: z.enum(['low', 'medium', 'high']),
-    // File attachments
-    attachments: z.array(z.instanceof(File)).optional(),
-  }).refine((data) => {
-    // If technical support is selected, require either PNC or Serial Number
-    if (data.supportType === 'technical') {
-      return data.pncNumber || data.serialNumber;
-    }
-    return true;
-  }, {
-    message: t('validation.pncOrSerialRequired', 'For technical support, either PNC or Serial Number is required'),
-    path: ['pncNumber'],
-  }), [t]);
-
-  type FormData = z.infer<typeof schema>;
   const [files, setFiles] = useState<File[]>([]);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [submitMessage, setSubmitMessage] = useState<string>('');
@@ -58,7 +54,6 @@ const B2BSupportForm = () => {
   } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
-      urgency: 'medium',
       supportType: 'technical',
     }
   });
@@ -66,147 +61,47 @@ const B2BSupportForm = () => {
   const supportType = watch('supportType');
   const customerNumber = watch('customerNumber');
 
-  // Function to validate customer number against Husqvarna Group API
+  // Function to validate customer number
   const validateCustomer = async (customerNum: string) => {
     if (!customerNum || customerNum.length < 3) {
       setCustomerValidation({ status: 'idle', message: '' });
       return;
     }
 
-    setCustomerValidation({ status: 'validating', message: '🔍 Validerar kundnummer...' });
+    setCustomerValidation({ status: 'validating', message: 'Validerar kundnummer...' });
     
     try {
-      // Get backend API configuration
-      const backendApiBaseUrl = import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:8000';
-      
-      // Default customer code (can be made configurable later)
-      const customerCode = 'DOJ';
-      
-      console.log('🔍 CUSTOMER VALIDATION DEBUG:', {
-        customerNum,
-        customerCode,
-        backendApiBaseUrl,
-        env_VITE_BACKEND_API_URL: import.meta.env.VITE_BACKEND_API_URL,
-        all_env_vars: import.meta.env,
-        backendUrl: `${backendApiBaseUrl}/api/husqvarna/validate-customer?customer_number=${customerNum}&customer_code=${customerCode}`
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+      const response = await fetch(`${apiUrl}/esb/validate-customer`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          customer_number: customerNum,
+          customer_code: 'DOJ'  // Default customer code
+        }),
       });
+
+      const result = await response.json();
       
-      // Call backend proxy for Husqvarna Group API validation
-      try {
-        const backendProxyUrl = `${backendApiBaseUrl}/api/husqvarna/validate-customer?customer_number=${customerNum}&customer_code=${customerCode}`;
-        console.log('🌐 Making API request to backend proxy:', backendProxyUrl);
-        
-        const husqvarnaResponse = await fetch(backendProxyUrl, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-        
-        console.log('📡 Backend proxy API response status:', husqvarnaResponse.status);
-        console.log('📋 Backend proxy API response headers:', Object.fromEntries(husqvarnaResponse.headers.entries()));
-
-        if (husqvarnaResponse.ok) {
-          const husqvarnaResult = await husqvarnaResponse.json();
-          console.log('Backend proxy API response:', husqvarnaResult);
-          
-          if (husqvarnaResult.valid && husqvarnaResult.account_id) {
-            setCustomerValidation({
-              status: 'valid',
-              message: husqvarnaResult.message || `✅ Kundnummer ${customerNum} verifierat! (Account ID: ${husqvarnaResult.account_id.substring(0, 8)}...)`,
-              accountId: husqvarnaResult.account_id
-            });
-            return;
-          } else {
-            setCustomerValidation({
-              status: 'invalid',
-              message: husqvarnaResult.message || `❌ Kundnummer ${customerNum} hittades inte i Husqvarna Group systemet`
-            });
-            return;
-          }
-        } else {
-          console.warn('🚨 Backend proxy API validation failed with status:', husqvarnaResponse.status);
-          const errorText = await husqvarnaResponse.text();
-          console.warn('🚨 Backend proxy API error response:', errorText);
-        }
-      } catch (husqvarnaError) {
-        console.error('🚨 Backend proxy API validation failed, falling back to ESB validation:', husqvarnaError);
-        if (husqvarnaError instanceof Error) {
-          console.error('🚨 Detailed error info:', {
-            name: husqvarnaError.name,
-            message: husqvarnaError.message,
-            stack: husqvarnaError.stack,
-            cause: husqvarnaError.cause
-          });
-        }
-      }
-
-      // Fallback to ESB validation if Husqvarna Group API is unavailable
-      try {
-        const esbResponse = await fetch('https://api.hsqforms.se/esb/validate-customer', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ customerNumber: customerNum }),
-        });
-
-        if (esbResponse.ok) {
-          const esbResult = await esbResponse.json();
-          if (esbResult.valid) {
-            setCustomerValidation({
-              status: 'valid',
-              message: `🟡 Kundnummer ${customerNum} validerat via ESB (fallback system)`,
-              accountId: esbResult.accountId || customerNum
-            });
-            return;
-          } else {
-            setCustomerValidation({
-              status: 'invalid',
-              message: esbResult.message || `❌ Kundnummer ${customerNum} hittades inte i något system`
-            });
-            return;
-          }
-        }
-      } catch (esbError) {
-        console.warn('ESB validation also failed, using local validation:', esbError);
-      }
-
-      // Final fallback to basic local validation
-      const isValidFormat = /^[A-Z0-9]{3,20}$/.test(customerNum.toUpperCase());
-      
-      // Simulate API delay for better UX
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      if (isValidFormat) {
+      if (result.is_valid) {
         setCustomerValidation({
           status: 'valid',
-          message: `🟡 Kundnummer ${customerNum} har giltigt format (offline validering - ej verifierat)`,
-          accountId: customerNum
+          message: 'Kundnummer giltigt',
+          accountId: result.account_id
         });
       } else {
-        // Provide more specific error messages
-        let errorMessage = '';
-        if (customerNum.length < 3) {
-          errorMessage = `❌ Kundnummer för kort: "${customerNum}" (minimum 3 tecken)`;
-        } else if (customerNum.length > 20) {
-          errorMessage = `❌ Kundnummer för långt: "${customerNum}" (maximum 20 tecken)`;
-        } else if (!/^[A-Z0-9]+$/i.test(customerNum)) {
-          errorMessage = `❌ Ogiltiga tecken i kundnummer: "${customerNum}" (endast bokstäver och siffror)`;
-        } else {
-          errorMessage = `❌ Ogiltigt kundnummer format: "${customerNum}"`;
-        }
-        
         setCustomerValidation({
           status: 'invalid',
-          message: errorMessage
+          message: result.message || 'Ogiltigt kundnummer'
         });
       }
     } catch (error) {
       console.error('Customer validation error:', error);
       setCustomerValidation({
         status: 'invalid',
-        message: `⚠️ Kunde inte validera kundnummer "${customerNum}" - tekniskt fel`
+        message: 'Kunde inte validera kundnummer'
       });
     }
   };
@@ -230,7 +125,7 @@ const B2BSupportForm = () => {
     // Check if customer is validated
     if (customerValidation.status !== 'valid') {
       setSubmitStatus('error');
-      setSubmitMessage(t('support.customerValidationRequired', 'Vänligen kontrollera att kundnumret är giltigt innan du skickar.'));
+      setSubmitMessage('Vänligen kontrollera att kundnumret är giltigt innan du skickar.');
       return;
     }
 
@@ -238,160 +133,42 @@ const B2BSupportForm = () => {
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
       console.log('Using API URL:', apiUrl);
       
-      // Use the new template-based API endpoint
-      const templateId = '958915ec-fed1-4e7e-badd-4598502fe6a1'; // B2B Support Form template ID
-      
-      // Prepare form data according to the template schema
-      const formSubmissionData = {
-        companyName: data.companyName,
-        contactPerson: data.contactPerson,
-        customerNumber: data.customerNumber,
+      // Use the new ESB integration endpoint
+      const payload = {
+        customer_number: data.customerNumber,
+        customer_code: 'DOJ',
+        description: data.problemDescription,
+        company_name: data.companyName,
+        contact_person: data.contactPerson,
         email: data.email,
         phone: data.phone || '',
+        support_type: data.supportType,
         subject: data.subject,
-        supportType: data.supportType,
-        pncNumber: data.pncNumber || '',
-        serialNumber: data.serialNumber || '',
-        problemDescription: data.problemDescription,
-        urgency: data.urgency,
-        language: 'sv' // Default to Swedish
+        urgency: data.urgency
       };
 
-      console.log('Sending form submission data:', formSubmissionData);
+      console.log('Sending ESB payload:', payload);
 
-      const response = await fetch(`${apiUrl}/templates/${templateId}/submit`, {
+      const response = await fetch(`${apiUrl}/esb/b2b-support`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          data: formSubmissionData,
-          metadata: {
-            source: 'b2b-support-form',
-            customerValidated: true,
-            accountId: customerValidation.accountId
-          }
-        }),
+        body: JSON.stringify(payload),
       });
 
       const result = await response.json();
-      console.log('API Response:', result);
+      console.log('ESB Response:', result);
       
-      if (!response.ok) {
-        throw new Error(result.detail || result.error || 'Submission failed');
-      }
-      
-      if (result.success !== false) {
-        // Handle file uploads if there are any
-        let submissionId = result.submission?.id || result.id;
-        
-        if (files.length > 0 && submissionId) {
-          const fileFormData = new FormData();
-          files.forEach(file => {
-            fileFormData.append('files', file);
-          });
-
-          const fileResponse = await fetch(`${apiUrl}/files/upload/${submissionId}`, {
-            method: 'POST',
-            body: fileFormData,
-          });
-
-          if (!fileResponse.ok) {
-            console.warn('File upload failed, but form was submitted successfully');
-          }
-        }
-
-        // Also send to Husqvarna Group Cases API and ESB system as complement
-        try {
-          console.log('Sending to Husqvarna Group Cases API and ESB system...');
-          
-          // Get Husqvarna API configuration
-          const husqvarnaApiBaseUrl = import.meta.env.VITE_HUSQVARNA_API_BASE_URL || 'https://api-qa.integration.husqvarnagroup.com/hqw170/v1';
-          const husqvarnaApiKey = import.meta.env.VITE_HUSQVARNA_API_KEY || '3d9c4d8a3c5c47f1a2a0ec096496a786';
-          
-          // Default customer code (DOJ for EMEA, can be expanded for APAC routing)
-          const customerCode = 'DOJ';
-          
-          // First try Husqvarna Group Cases API
-          try {
-            const casesPayload = {
-              accountId: customerValidation.accountId,
-              customerNumber: data.customerNumber,
-              customerCode: customerCode,
-              caseOriginCode: '115000008',
-              description: `Subject: ${data.subject}\n\nType: ${data.supportType}\nUrgency: ${data.urgency}\n\nDescription:\n${data.problemDescription}${data.pncNumber ? `\n\nPNC: ${data.pncNumber}` : ''}${data.serialNumber ? `\nSerial: ${data.serialNumber}` : ''}\n\nContact: ${data.contactPerson} (${data.email})${data.phone ? ` - ${data.phone}` : ''}\nCompany: ${data.companyName}`
-            };
-
-            console.log('Sending to Husqvarna Cases API:', casesPayload);
-
-            const casesResponse = await fetch(`${husqvarnaApiBaseUrl}/cases`, {
-              method: 'POST',
-              headers: {
-                'Ocp-Apim-Subscription-Key': husqvarnaApiKey,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify(casesPayload),
-            });
-
-            if (casesResponse.ok) {
-              const casesResult = await casesResponse.json();
-              console.log('Successfully created case in Husqvarna Group system:', casesResult);
-            } else {
-              console.warn('Husqvarna Cases API failed with status:', casesResponse.status);
-              const errorData = await casesResponse.text();
-              console.warn('Husqvarna Cases API error:', errorData);
-            }
-          } catch (casesError) {
-            console.warn('Husqvarna Group Cases API error:', casesError);
-          }
-
-          // Fallback to ESB system
-          try {
-            const esbResponse = await fetch('https://api.hsqforms.se/esb/b2b-support', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                // ESB format - map from our form data
-                name: data.contactPerson,
-                email: data.email,
-                company: data.companyName,
-                phone: data.phone || '',
-                customerNumber: data.customerNumber,
-                subject: data.subject,
-                message: data.problemDescription,
-                supportType: data.supportType,
-                pncNumber: data.pncNumber || '',
-                serialNumber: data.serialNumber || '',
-                urgency: data.urgency,
-                // Include reference to our local submission and Husqvarna data
-                localSubmissionId: submissionId,
-                accountId: customerValidation.accountId,
-                customerCode: customerCode,
-                source: 'b2b-support-form-v2-husqvarna'
-              }),
-            });
-
-            if (esbResponse.ok) {
-              console.log('Successfully sent to ESB system as fallback');
-            } else {
-              console.warn('ESB submission failed');
-            }
-          } catch (esbError) {
-            console.warn('ESB submission error (non-critical):', esbError);
-          }
-
-        } catch (systemError) {
-          console.warn('External systems submission error (non-critical):', systemError);
-          // Don't fail the whole form submission if external systems fail
-        }
-        
+      if (result.success) {
         // Show success message
         setSubmitStatus('success');
-        let successMsg = 'Ärende skapat framgångsrikt!';
-        if (submissionId) {
-          successMsg += ` (Ref: ${submissionId})`;
+        let successMsg = result.message || 'Ärende skapat framgångsrikt!';
+        if (result.submission_id) {
+          successMsg += ` (Ref: ${result.submission_id})`;
+        }
+        if (result.case_id) {
+          successMsg += ` (Ärende-ID: ${result.case_id})`;
         }
         setSubmitMessage(successMsg);
         
@@ -400,7 +177,7 @@ const B2BSupportForm = () => {
         setFiles([]);
         setCustomerValidation({ status: 'idle', message: '' });
       } else {
-        throw new Error(result.error || result.message || 'Submission failed');
+        throw new Error(result.message || 'Submission failed');
       }
       
     } catch (error) {
@@ -412,7 +189,7 @@ const B2BSupportForm = () => {
       
       if (error instanceof Error) {
         if (error.message.includes('fetch')) {
-          errorMessage = t('errors.networkError', 'Cannot connect to the server. Please check your internet connection or try again later.');
+          errorMessage = 'Cannot connect to the server. Please check your internet connection or try again later.';
         } else if (error.message.includes('HTTP')) {
           errorMessage = error.message;
         } else {
@@ -440,8 +217,34 @@ const B2BSupportForm = () => {
         {t('support.title', 'B2B Support')}
       </h1>
       <p className="text-gray-600 mb-8">
-        {t('support.description', 'Fyll i formuläret nedan för att få hjälp med dina Husqvarna-produkter. Vi återkommer inom 2-3 arbetsdagar.')}
+        {t('support.description', 'Fyll i formuläret nedan för att få hjälp med dina Husqvarna-produkter.')}
       </p>
+
+      {/* Status Messages */}
+      {submitStatus !== 'idle' && (
+        <div className={`mb-6 p-4 rounded-md ${
+          submitStatus === 'success' 
+            ? 'bg-green-50 border border-green-200 text-green-800' 
+            : 'bg-red-50 border border-red-200 text-red-800'
+        }`}>
+          <div className="flex">
+            <div className="flex-shrink-0">
+              {submitStatus === 'success' ? (
+                <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+              ) : (
+                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
+                </svg>
+              )}
+            </div>
+            <div className="ml-3">
+              <p className="text-sm font-medium">{submitMessage}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         {/* Support Type Selection */}
@@ -486,9 +289,7 @@ const B2BSupportForm = () => {
 
         {/* Customer Information */}
         <div className="space-y-4">
-          <h2 className="text-xl font-semibold text-gray-900">
-            {t('support.customerInfo', 'Customer Information')}
-          </h2>
+          <h2 className="text-xl font-semibold text-gray-900">{t('support.customerInfo', 'Contact Information')}</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Customer Number with validation */}
@@ -499,38 +300,33 @@ const B2BSupportForm = () => {
               <input
                 type="text"
                 {...register('customerNumber')}
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:border-transparent ${
-                  customerValidation.status === 'valid' ? 'border-green-300 focus:ring-green-500' :
-                  customerValidation.status === 'invalid' ? 'border-red-300 focus:ring-red-500' :
-                  customerValidation.status === 'validating' ? 'border-blue-300 focus:ring-blue-500' :
-                  'border-gray-300 focus:ring-blue-500'
-                }`}
-                placeholder={t('support.customerNumberPlaceholder', 'Ange ditt kundnummer (ex: 1411768)')}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder={t('support.customerNumberPlaceholder', 'Ange ditt kundnummer')}
               />
               {/* Customer validation feedback */}
               {customerValidation.status !== 'idle' && (
-                <div className={`mt-2 p-3 rounded-md border flex items-center text-sm font-medium ${
-                  customerValidation.status === 'validating' ? 'bg-blue-50 border-blue-200 text-blue-700' :
-                  customerValidation.status === 'valid' ? 'bg-green-50 border-green-200 text-green-700' :
-                  'bg-red-50 border-red-200 text-red-700'
+                <div className={`mt-1 text-sm flex items-center ${
+                  customerValidation.status === 'validating' ? 'text-blue-600' :
+                  customerValidation.status === 'valid' ? 'text-green-600' :
+                  'text-red-600'
                 }`}>
                   {customerValidation.status === 'validating' && (
-                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
                   )}
                   {customerValidation.status === 'valid' && (
-                    <svg className="mr-3 h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="mr-2 h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                     </svg>
                   )}
                   {customerValidation.status === 'invalid' && (
-                    <svg className="mr-3 h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="mr-2 h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
                     </svg>
                   )}
-                  <span>{customerValidation.message}</span>
+                  {customerValidation.message}
                 </div>
               )}
               {errors.customerNumber && (
@@ -551,40 +347,6 @@ const B2BSupportForm = () => {
               />
               {errors.email && (
                 <p className="text-red-600 text-sm mt-1">{errors.email.message}</p>
-              )}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Company Name */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t('support.companyName', 'Företagsnamn')} <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                {...register('companyName')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder={t('support.companyNamePlaceholder', 'Ange företagsnamn')}
-              />
-              {errors.companyName && (
-                <p className="text-red-600 text-sm mt-1">{errors.companyName.message}</p>
-              )}
-            </div>
-
-            {/* Contact Person */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t('support.contactPerson', 'Kontaktperson')} <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                {...register('contactPerson')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder={t('support.contactPersonPlaceholder', 'Förnamn Efternamn')}
-              />
-              {errors.contactPerson && (
-                <p className="text-red-600 text-sm mt-1">{errors.contactPerson.message}</p>
               )}
             </div>
           </div>
@@ -652,9 +414,7 @@ const B2BSupportForm = () => {
 
         {/* Problem Description */}
         <div className="space-y-4">
-          <h2 className="text-xl font-semibold text-gray-900">
-            {t('support.caseDescription', 'Case Description')}
-          </h2>
+          <h2 className="text-xl font-semibold text-gray-900">{t('support.caseDescription', 'Case Description')}</h2>
           
           {/* Subject */}
           <div>
@@ -687,24 +447,6 @@ const B2BSupportForm = () => {
               <p className="text-red-600 text-sm mt-1">{errors.problemDescription.message}</p>
             )}
           </div>
-
-          {/* Urgency */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              {t('support.urgency', 'Prioritet')}
-            </label>
-            <select
-              {...register('urgency')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="low">{t('support.urgencyLow', 'Låg - Inom en vecka')}</option>
-              <option value="medium">{t('support.urgencyMedium', 'Normal - Inom 2-3 dagar')}</option>
-              <option value="high">{t('support.urgencyHigh', 'Hög - Så snart som möjligt')}</option>
-            </select>
-            {errors.urgency && (
-              <p className="text-red-600 text-sm mt-1">{errors.urgency.message}</p>
-            )}
-          </div>
         </div>
 
         {/* File Attachments */}
@@ -731,7 +473,7 @@ const B2BSupportForm = () => {
               </svg>
               <div className="mt-4">
                 <p className="text-sm text-gray-600">
-                  {t('support.uploadPrompt', 'Click to upload files or drag and drop')}
+                  Klicka för att ladda upp filer eller drag och släpp
                 </p>
               </div>
             </label>
@@ -759,32 +501,6 @@ const B2BSupportForm = () => {
           )}
         </div>
 
-        {/* Status Messages */}
-        {submitStatus !== 'idle' && (
-          <div className={`mb-6 p-4 rounded-md ${
-            submitStatus === 'success' 
-              ? 'bg-green-50 border border-green-200 text-green-800' 
-              : 'bg-red-50 border border-red-200 text-red-800'
-          }`}>
-            <div className="flex">
-              <div className="flex-shrink-0">
-                {submitStatus === 'success' ? (
-                  <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                ) : (
-                  <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
-                  </svg>
-                )}
-              </div>
-              <div className="ml-3">
-                <p className="text-sm font-medium">{submitMessage}</p>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Submit Button */}
         <div className="flex justify-end">
           <button
@@ -793,7 +509,7 @@ const B2BSupportForm = () => {
             className={`px-6 py-3 rounded-md font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 ${
               isSubmitting || customerValidation.status !== 'valid'
                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                : 'bg-husqvarna-blue text-white hover:bg-husqvarna-blue-dark focus:ring-husqvarna-blue'
+                : 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500'
             }`}
           >
             {isSubmitting ? (
