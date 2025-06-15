@@ -36,16 +36,20 @@ function FormPage() {
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div>
-              <h1 className="text-xl font-semibold text-gray-900">
-                HSQ Forms
-              </h1>
-              <p className="text-sm text-gray-600">
-                {t('app.subtitle', 'B2B Returns Portal')}
-              </p>
+          <div className="flex justify-center items-center py-4 relative">
+            {/* Centered Husqvarna Logo */}
+            <div className="flex items-center justify-center">
+              <img 
+                src="https://portal.husqvarnagroup.com/static/b2b/assets/with-name.4d5589ae.svg" 
+                alt="Husqvarna Group" 
+                className="h-16 w-16"
+              />
             </div>
-            <LanguageSelector />
+            
+            {/* Language Selector positioned to the right */}
+            <div className="absolute right-0">
+              <LanguageSelector />
+            </div>
           </div>
         </div>
       </header>
