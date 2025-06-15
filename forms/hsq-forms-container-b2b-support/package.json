@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --port 3003",
     "build": "vite build",
-    "start": "serve -s dist -l 3003"
+    "start": "serve -s dist -l 3000 --single"
   },
   "dependencies": {
     "@hookform/resolvers": "^2.9.10",
