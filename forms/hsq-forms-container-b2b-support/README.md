@@ -1,14 +1,14 @@
-# HSQ Forms - B2B Returns Container
+# HSQ B2B Support Form
 
-A React-based web application for handling B2B product returns, built with TypeScript, Vite, and Tailwind CSS.
+A production-ready React application for handling B2B support requests, built with TypeScript, Vite, and Tailwind CSS.
 
-## 🚀 Quick Start
+## 🚀 Production Deployment
 
 ```bash
 # Start the container
-docker-compose up --build
+docker-compose up -d
 
-# App available at: http://localhost:3002
+# App available at: http://localhost:3003
 ```
 
 ## ✨ Features
@@ -16,19 +16,18 @@ docker-compose up --build
 - **Multi-language Support**: English, Swedish, German
 - **Form Validation**: Real-time validation with Zod and React Hook Form
 - **Responsive Design**: Mobile-first with Tailwind CSS
-- **Product Returns Specific**: Order numbers, serial numbers, return reasons
+- **Support Request Specific**: Customer validation, technical support, urgency levels
 - **API Integration**: Connects to HSQ Forms API at localhost:8000
-- **Dockerized**: Easy deployment and development
+- **Production Ready**: Optimized Docker container
 
-## 🔧 Development
+## 🔧 Configuration
 
-### Quick Development Cycle
+### Environment Variables
+
 ```bash
-# Make changes, then:
-./dev-helper.sh quick
-
-# For active development with live reload:
-./dev-helper.sh dev
+# .env file
+VITE_API_BASE_URL=http://localhost:8000
+VITE_APP_TITLE=HSQ B2B Support Form
 ```
 
 ### Available Commands

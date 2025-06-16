@@ -1,12 +1,12 @@
-# HSQ Forms - B2B Returns Container
+# HSQ B2B Returns Form
 
-A React-based web application for handling B2B product returns, built with TypeScript, Vite, and Tailwind CSS.
+A production-ready React application for handling B2B product returns, built with TypeScript, Vite, and Tailwind CSS.
 
-## 🚀 Quick Start
+## 🚀 Production Deployment
 
 ```bash
 # Start the container
-docker-compose up --build
+docker-compose up -d
 
 # App available at: http://localhost:3002
 ```
@@ -18,26 +18,42 @@ docker-compose up --build
 - **Responsive Design**: Mobile-first with Tailwind CSS
 - **Product Returns Specific**: Order numbers, serial numbers, return reasons
 - **API Integration**: Connects to HSQ Forms API at localhost:8000
-- **Dockerized**: Easy deployment and development
+- **Dockerized**: Ready for production deployment
 
-## 🔧 Development
+## 🔧 Configuration
 
-### Quick Development Cycle
+### Environment Variables
 ```bash
-# Make changes, then:
-./dev-helper.sh quick
-
-# For active development with live reload:
-./dev-helper.sh dev
+# .env file
+VITE_API_BASE_URL=http://localhost:8000
+VITE_APP_TITLE=HSQ B2B Returns Form
 ```
 
-### Available Commands
+## 📊 Container Management
+
+### Basic Commands
+
 ```bash
-./dev-helper.sh status   # Check container status
-./dev-helper.sh quick    # Quick rebuild
-./dev-helper.sh dev      # Development mode
-./dev-helper.sh clean    # Clean rebuild
-./dev-helper.sh stop     # Stop containers
+# Check container status
+docker-compose ps
+
+# View logs
+docker-compose logs -f
+
+# Restart container
+docker-compose restart
+
+# Stop container
+docker-compose down
+```
+
+### Health Verification
+
+```bash
+# Check if form is accessible
+curl -I http://localhost:3002
+
+# Should return: HTTP/1.1 200 OK
 ```
 
 ## 📋 Form Fields
@@ -76,10 +92,25 @@ src/
 - **Development Mode**: Port 3002, live reload with Vite
 - **API Connection**: http://localhost:8000
 
-## 📚 Documentation
+## 📚 Integration
 
-- [DEVELOPMENT_GUIDE.md](./DEVELOPMENT_GUIDE.md) - Detailed development workflow
-- [QUICK_REFERENCE.md](./QUICK_REFERENCE.md) - Quick commands reference
+### Sitecore CMS Integration
+
+```html
+<!-- Basic iframe embedding -->
+<iframe src="http://localhost:3002" width="100%" height="800px"></iframe>
+
+<!-- With URL parameters -->
+<iframe src="http://localhost:3002?lang=sv&embed=true" width="100%" height="600px"></iframe>
+```
+
+### API Integration
+
+The form submits to the HSQ Forms API using template-based submissions:
+
+- **Template ID**: Auto-configured for B2B Returns
+- **Submission Endpoint**: `POST /api/templates/{template_id}/submit`
+- **File Upload Support**: Multi-file attachment capability
 
 ## 🔗 Related
 

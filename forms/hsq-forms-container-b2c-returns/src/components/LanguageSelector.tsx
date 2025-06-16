@@ -10,9 +10,6 @@ const LanguageSelector: React.FC = () => {
   const languages = [
     { code: 'en', name: 'English', flag: '🇺🇸' },
     { code: 'sv', name: 'Svenska', flag: '🇸🇪' },
-    { code: 'da', name: 'Dansk', flag: '🇩🇰' },
-    { code: 'no', name: 'Norsk', flag: '🇳🇴' },
-    { code: 'fi', name: 'Suomi', flag: '🇫🇮' },
     { code: 'de', name: 'Deutsch', flag: '🇩🇪' },
   ];
 

@@ -79,3 +79,4 @@ backup_old_structure_*/
 # Temporary files
 *.tmp
 *.temp
+current-containerapp.yaml

@@ -11,10 +11,6 @@ services:
     project: ./src
     language: python
     host: containerapp
-    docker:
-      path: ./Dockerfile
-      context: .
-      target: production
 
 # Azure resource deployment configuration
 infra:
@@ -53,7 +49,7 @@ hooks:
     run: |
       echo "Running pre-deployment checks..."
       # Validate Docker build
-      docker build -t hsq-forms-api-test ./apps/app
+      docker build -t hsq-forms-api-test -f Dockerfile .
       echo "Pre-deployment checks completed"
     continueOnError: false
 

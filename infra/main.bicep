@@ -26,7 +26,7 @@ param containerAppScale object = {
 }
 
 // Variables för resursnamn med miljöspecifik namngivning
-var resourceToken = toLower(uniqueString(subscription().id, resourceGroup().id, location))
+var resourceToken = toLower(uniqueString(subscription().id, resourceGroup().id, environmentName))
 var tags = {
   Environment: environmentName
   Project: projectName
@@ -123,9 +123,6 @@ resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2023-03-01-pr
     highAvailability: {
       mode: 'Disabled' // Aktivera för production
     }
-    network: {
-      publicNetworkAccess: 'Enabled' // Ändra för production med VNet
-    }
   }
 
   // Databas för applikationen
@@ -187,17 +184,8 @@ resource managedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-
   tags: tags
 }
 
-// Storage Blob Data Contributor role för Managed Identity
-var storageRoleDefinitionId = 'ba92f5b4-2d11-453d-a403-e96b0029c9fe' // Storage Blob Data Contributor
-resource storageRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  scope: storageAccount
-  name: guid(storageAccount.id, managedIdentity.id, storageRoleDefinitionId)
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageRoleDefinitionId)
-    principalId: managedIdentity.properties.principalId
-    principalType: 'ServicePrincipal'
-  }
-}
+// Note: Storage role assignment removed due to permission constraints
+// This will need to be configured manually in Azure Portal or by admin
 
 // Container App för API
 resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
@@ -242,7 +230,7 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
       containers: [
         {
           name: 'hsq-forms-api'
-          image: 'nginx:latest' // Kommer att uppdateras av deployment pipeline
+          image: 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest' // Base image för första deployment
           env: [
             {
               name: 'ENVIRONMENT'
@@ -280,9 +268,19 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
   }
 }
 
-// Outputs för andra services eller CI/CD
+// Outputs för azd och andra services
+output RESOURCE_GROUP_ID string = resourceGroup().id
+output AZURE_CONTAINER_APPS_ENVIRONMENT_ID string = containerAppsEnvironment.id
+output AZURE_CONTAINER_REGISTRY_ENDPOINT string = 'https://index.docker.io/v1/' // Docker Hub som default
+output AZURE_CONTAINER_REGISTRY_NAME string = 'dockerhub' // Default registry
+output SERVICE_API_IDENTITY_PRINCIPAL_ID string = managedIdentity.properties.principalId
+output SERVICE_API_NAME string = containerApp.name
+output SERVICE_API_URI string = 'https://${containerApp.properties.configuration.ingress.fqdn}'
+output AZURE_STORAGE_ACCOUNT_NAME string = storageAccount.name
+output AZURE_STORAGE_BLOB_ENDPOINT string = storageAccount.properties.primaryEndpoints.blob
+
+// Backward compatibility outputs
 output storageAccountName string = storageAccount.name
-output storageAccountConnectionString string = 'DefaultEndpointsProtocol=https;AccountName=${storageAccount.name};AccountKey=${storageAccount.listKeys().keys[0].value};EndpointSuffix=${environment().suffixes.storage}'
 output databaseHost string = postgresServer.properties.fullyQualifiedDomainName
 output databaseName string = postgresServer::database.name
 output containerAppUrl string = 'https://${containerApp.properties.configuration.ingress.fqdn}'
