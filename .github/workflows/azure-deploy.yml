@@ -1,6 +1,6 @@
 name: Deploy to Azure Container Apps
 
-# Updated to use OIDC authentication - test deploy
+# Using Managed Identity for Container Apps deployment
 on:
   push:
     branches: [ main, develop ]
@@ -29,7 +29,7 @@ env:
   PROD_REGISTRY: hsqformsprodacr.azurecr.io
   PROD_IMAGE_NAME: hsq-forms-api
   PROD_RESOURCE_GROUP: rg-hsq-forms-prod
-  PROD_CONTAINER_APP: hsq-forms-api
+  PROD_CONTAINER_APP: hsq-forms-api-v2
 
 jobs:
   test:
@@ -218,16 +218,11 @@ jobs:
         IMAGE="${{ env.DEV_REGISTRY }}/${{ env.DEV_IMAGE_NAME }}:latest"
         echo "Deploying $IMAGE to ${{ env.DEV_CONTAINER_APP }}"
         
-        # Hämta access token för att göra deployment
-        TOKEN=$(az acr login --name ${{ env.DEV_REGISTRY }} --expose-token --output tsv --query accessToken)
-        
-        # Uppdatera container app med senaste image
+        # Uppdatera container app med senaste image (använder managed identity för registry access)
         az containerapp update \
           --name ${{ env.DEV_CONTAINER_APP }} \
           --resource-group ${{ env.DEV_RESOURCE_GROUP }} \
-          --image $IMAGE \
-          --registry-username 00000000-0000-0000-0000-000000000000 \
-          --registry-password $TOKEN
+          --image $IMAGE
 
   deploy-to-prod:
     needs: build-and-push-prod
@@ -251,13 +246,8 @@ jobs:
         IMAGE="${{ env.PROD_REGISTRY }}/${{ env.PROD_IMAGE_NAME }}:$TAG"
         echo "Deploying $IMAGE to ${{ env.PROD_CONTAINER_APP }}"
         
-        # Hämta access token för att göra deployment
-        TOKEN=$(az acr login --name ${{ env.PROD_REGISTRY }} --expose-token --output tsv --query accessToken)
-        
-        # Uppdatera container app med senaste image
+        # Uppdatera container app med senaste image (använder managed identity för registry access)
         az containerapp update \
           --name ${{ env.PROD_CONTAINER_APP }} \
           --resource-group ${{ env.PROD_RESOURCE_GROUP }} \
-          --image $IMAGE \
-          --registry-username 00000000-0000-0000-0000-000000000000 \
-          --registry-password $TOKEN
+          --image $IMAGE
