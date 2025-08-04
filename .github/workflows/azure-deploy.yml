@@ -1,5 +1,6 @@
 name: Deploy to Azure Container Apps
 
+# Updated to use OIDC authentication - test deploy
 on:
   push:
     branches: [ main, develop ]
@@ -8,9 +9,15 @@ on:
     branches: [ main ]
   workflow_dispatch:  # Allows manual triggering
 
+permissions:
+  id-token: write
+  contents: read
+
 env:
   # Common settings
   AZURE_SUBSCRIPTION: c0b03b12-570f-4442-b337-c9175ad4037f
+  AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+  AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
   
   # Development environment
   DEV_REGISTRY: hsqformsdevacr.azurecr.io
@@ -83,31 +90,11 @@ jobs:
       uses: docker/setup-buildx-action@v3
     
     - name: Azure CLI Login (Dev)
-      run: |
-        echo "Installing jq for JSON parsing..."
-        apt-get update && apt-get install -y jq
-        
-        if [[ -n "${{ secrets.AZURE_CLIENT_ID }}" && -n "${{ secrets.AZURE_TENANT_ID }}" && -n "${{ secrets.AZURE_CLIENT_SECRET }}" ]]; then
-          echo "Logging in with explicit client credentials"
-          az login --service-principal --username "${{ secrets.AZURE_CLIENT_ID }}" --tenant "${{ secrets.AZURE_TENANT_ID }}" --password "${{ secrets.AZURE_CLIENT_SECRET }}"
-          az account set --subscription "${{ env.AZURE_SUBSCRIPTION }}"
-          echo "Azure CLI login successful"
-        elif [[ -n "${{ secrets.AZURE_CREDENTIALS }}" ]]; then
-          echo "Trying to login with AZURE_CREDENTIALS JSON"
-          echo "${{ secrets.AZURE_CREDENTIALS }}" > azure_credentials.json
-          exit_code=0
-          az login --service-principal -u "$(cat azure_credentials.json | jq -r .clientId)" -p "$(cat azure_credentials.json | jq -r .clientSecret)" --tenant "$(cat azure_credentials.json | jq -r .tenantId)" || exit_code=$?
-          rm azure_credentials.json
-          if [[ $exit_code -ne 0 ]]; then
-            echo "Failed to login with AZURE_CREDENTIALS JSON"
-            exit 1
-          fi
-          az account set --subscription "${{ env.AZURE_SUBSCRIPTION }}"
-          echo "Azure CLI login successful with AZURE_CREDENTIALS JSON"
-        else
-          echo "No valid Azure credentials found. Please set either AZURE_CREDENTIALS JSON or individual AZURE_CLIENT_ID, AZURE_TENANT_ID, and AZURE_CLIENT_SECRET."
-          exit 1
-        fi
+      uses: azure/login@v1
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ env.AZURE_SUBSCRIPTION }}
     
     # Hämta ACR access token för att kunna logga in på ACR
     - name: Get ACR Access Token
@@ -165,31 +152,11 @@ jobs:
       uses: docker/setup-buildx-action@v3
     
     - name: Azure CLI Login (Prod)
-      run: |
-        echo "Installing jq for JSON parsing..."
-        apt-get update && apt-get install -y jq
-        
-        if [[ -n "${{ secrets.AZURE_CLIENT_ID }}" && -n "${{ secrets.AZURE_TENANT_ID }}" && -n "${{ secrets.AZURE_CLIENT_SECRET }}" ]]; then
-          echo "Logging in with explicit client credentials"
-          az login --service-principal --username "${{ secrets.AZURE_CLIENT_ID }}" --tenant "${{ secrets.AZURE_TENANT_ID }}" --password "${{ secrets.AZURE_CLIENT_SECRET }}"
-          az account set --subscription "${{ env.AZURE_SUBSCRIPTION }}"
-          echo "Azure CLI login successful"
-        elif [[ -n "${{ secrets.AZURE_CREDENTIALS }}" ]]; then
-          echo "Trying to login with AZURE_CREDENTIALS JSON"
-          echo "${{ secrets.AZURE_CREDENTIALS }}" > azure_credentials.json
-          exit_code=0
-          az login --service-principal -u "$(cat azure_credentials.json | jq -r .clientId)" -p "$(cat azure_credentials.json | jq -r .clientSecret)" --tenant "$(cat azure_credentials.json | jq -r .tenantId)" || exit_code=$?
-          rm azure_credentials.json
-          if [[ $exit_code -ne 0 ]]; then
-            echo "Failed to login with AZURE_CREDENTIALS JSON"
-            exit 1
-          fi
-          az account set --subscription "${{ env.AZURE_SUBSCRIPTION }}"
-          echo "Azure CLI login successful with AZURE_CREDENTIALS JSON"
-        else
-          echo "No valid Azure credentials found. Please set either AZURE_CREDENTIALS JSON or individual AZURE_CLIENT_ID, AZURE_TENANT_ID, and AZURE_CLIENT_SECRET."
-          exit 1
-        fi
+      uses: azure/login@v1
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ env.AZURE_SUBSCRIPTION }}
     
     # Hämta ACR access token för att kunna logga in på ACR
     - name: Get ACR Access Token
@@ -239,31 +206,11 @@ jobs:
     - uses: actions/checkout@v4
     
     - name: Azure CLI Login (Deploy Dev)
-      run: |
-        echo "Installing jq for JSON parsing..."
-        apt-get update && apt-get install -y jq
-        
-        if [[ -n "${{ secrets.AZURE_CLIENT_ID }}" && -n "${{ secrets.AZURE_TENANT_ID }}" && -n "${{ secrets.AZURE_CLIENT_SECRET }}" ]]; then
-          echo "Logging in with explicit client credentials"
-          az login --service-principal --username "${{ secrets.AZURE_CLIENT_ID }}" --tenant "${{ secrets.AZURE_TENANT_ID }}" --password "${{ secrets.AZURE_CLIENT_SECRET }}"
-          az account set --subscription "${{ env.AZURE_SUBSCRIPTION }}"
-          echo "Azure CLI login successful"
-        elif [[ -n "${{ secrets.AZURE_CREDENTIALS }}" ]]; then
-          echo "Trying to login with AZURE_CREDENTIALS JSON"
-          echo "${{ secrets.AZURE_CREDENTIALS }}" > azure_credentials.json
-          exit_code=0
-          az login --service-principal -u "$(cat azure_credentials.json | jq -r .clientId)" -p "$(cat azure_credentials.json | jq -r .clientSecret)" --tenant "$(cat azure_credentials.json | jq -r .tenantId)" || exit_code=$?
-          rm azure_credentials.json
-          if [[ $exit_code -ne 0 ]]; then
-            echo "Failed to login with AZURE_CREDENTIALS JSON"
-            exit 1
-          fi
-          az account set --subscription "${{ env.AZURE_SUBSCRIPTION }}"
-          echo "Azure CLI login successful with AZURE_CREDENTIALS JSON"
-        else
-          echo "No valid Azure credentials found. Please set either AZURE_CREDENTIALS JSON or individual AZURE_CLIENT_ID, AZURE_TENANT_ID, and AZURE_CLIENT_SECRET."
-          exit 1
-        fi
+      uses: azure/login@v1
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ env.AZURE_SUBSCRIPTION }}
     
     - name: Deploy to Azure Container App (Dev)
       run: |
@@ -291,31 +238,11 @@ jobs:
     - uses: actions/checkout@v4
     
     - name: Azure CLI Login (Deploy Prod)
-      run: |
-        echo "Installing jq for JSON parsing..."
-        apt-get update && apt-get install -y jq
-        
-        if [[ -n "${{ secrets.AZURE_CLIENT_ID }}" && -n "${{ secrets.AZURE_TENANT_ID }}" && -n "${{ secrets.AZURE_CLIENT_SECRET }}" ]]; then
-          echo "Logging in with explicit client credentials"
-          az login --service-principal --username "${{ secrets.AZURE_CLIENT_ID }}" --tenant "${{ secrets.AZURE_TENANT_ID }}" --password "${{ secrets.AZURE_CLIENT_SECRET }}"
-          az account set --subscription "${{ env.AZURE_SUBSCRIPTION }}"
-          echo "Azure CLI login successful"
-        elif [[ -n "${{ secrets.AZURE_CREDENTIALS }}" ]]; then
-          echo "Trying to login with AZURE_CREDENTIALS JSON"
-          echo "${{ secrets.AZURE_CREDENTIALS }}" > azure_credentials.json
-          exit_code=0
-          az login --service-principal -u "$(cat azure_credentials.json | jq -r .clientId)" -p "$(cat azure_credentials.json | jq -r .clientSecret)" --tenant "$(cat azure_credentials.json | jq -r .tenantId)" || exit_code=$?
-          rm azure_credentials.json
-          if [[ $exit_code -ne 0 ]]; then
-            echo "Failed to login with AZURE_CREDENTIALS JSON"
-            exit 1
-          fi
-          az account set --subscription "${{ env.AZURE_SUBSCRIPTION }}"
-          echo "Azure CLI login successful with AZURE_CREDENTIALS JSON"
-        else
-          echo "No valid Azure credentials found. Please set either AZURE_CREDENTIALS JSON or individual AZURE_CLIENT_ID, AZURE_TENANT_ID, and AZURE_CLIENT_SECRET."
-          exit 1
-        fi
+      uses: azure/login@v1
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ env.AZURE_SUBSCRIPTION }}
     
     - name: Deploy to Azure Container App (Prod)
       run: |
