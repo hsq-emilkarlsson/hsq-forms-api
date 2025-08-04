@@ -3,19 +3,15 @@ name: Configure ACR for GitHub Actions
 on:
   workflow_dispatch:  # Allows manual triggering
 
+env:
+  AZURE_SUBSCRIPTION: c0b03b12-570f-4442-b337-c9175ad4037f
+
 jobs:
   configure-acr:
     runs-on: ubuntu-latest
     
     steps:
     - name: Log in to Azure
-      uses: azure/login@v1
-      with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }}
-      continue-on-error: true
-        
-    - name: Fallback Azure login with client credentials if AZURE_CREDENTIALS JSON fails
-      if: ${{ failure() }}
       uses: azure/login@v1
       with:
         client-id: ${{ secrets.AZURE_CLIENT_ID }}
