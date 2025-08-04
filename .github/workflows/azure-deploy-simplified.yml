@@ -1,0 +1,79 @@
+name: Deploy to Azure Container Apps (Simplified)
+
+on:
+  push:
+    branches: [ develop ]
+  workflow_dispatch:  # Allows manual triggering
+
+env:
+  # Development environment
+  DEV_REGISTRY: hsqformsdevacr.azurecr.io
+  DEV_IMAGE_NAME: hsq-forms-api-dev
+  DEV_RESOURCE_GROUP: rg-hsq-forms-dev
+  DEV_CONTAINER_APP: hsq-forms-api-dev
+
+jobs:
+  build-and-push-dev:
+    runs-on: ubuntu-latest
+    
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Login to Azure Container Registry with Docker
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.DEV_REGISTRY }}
+        username: ${{ secrets.ACR_USERNAME }}
+        password: ${{ secrets.ACR_PASSWORD }}
+    
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.DEV_REGISTRY }}/${{ env.DEV_IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=sha,prefix=sha-
+          type=raw,value=latest
+    
+    - name: Build and push Docker image for DEV
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        platforms: linux/amd64
+        build-args: |
+          ENVIRONMENT=development
+
+  deploy-to-dev:
+    needs: build-and-push-dev
+    runs-on: ubuntu-latest
+    environment: development
+    
+    steps:
+    - name: Azure Login
+      uses: azure/login@v2
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+    
+    - name: Deploy to Container App
+      uses: azure/CLI@v1
+      with:
+        inlineScript: |
+          az containerapp update \
+            --resource-group ${{ env.DEV_RESOURCE_GROUP }} \
+            --name ${{ env.DEV_CONTAINER_APP }} \
+            --image ${{ needs.build-and-push-dev.outputs.image-tag }}
