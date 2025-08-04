@@ -3,6 +3,7 @@ name: Deploy to Azure Container Apps
 # Using Managed Identity for Container Apps deployment
 # Test deployment with fixed federated credentials for both develop and main branches
 # Verified GitHub secrets are correctly configured
+# Fixed tenant ID: 2a1c169e-715a-412b-b526-05da3f8412fa
 on:
   push:
     branches: [ main, develop ]
