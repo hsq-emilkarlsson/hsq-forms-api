@@ -33,21 +33,21 @@ class Settings(BaseSettings):
     
     # Basic application settings
     app_name: str = "HSQ Forms API"
-    environment: str = "development"  # development, staging, or production
-    debug: bool = False
+    environment: str = os.environ.get("APP_ENVIRONMENT", "development")  # Get from Docker build arg
+    debug: bool = environment != "production"
     testing: bool = False
-    log_level: str = "info"  # debug, info, warning, error, critical
+    log_level: str = "debug" if environment == "development" else "info"
     
     # API settings
     api_version: str = "1.0.0"
     api_title: str = "HSQ Forms API"
     api_description: str = "A flexible form submission API for handling form data"
     api_prefix: str = "/api"
-    api_docs_url: str = "/docs"
-    api_redoc_url: str = "/redoc"
+    api_docs_url: str = "/docs" if environment != "production" else None
+    api_redoc_url: str = "/redoc" if environment != "production" else None
     
     # CORS settings
-    cors_origins: Union[List[str], str] = "*"
+    cors_origins: Union[List[str], str] = "*" if environment == "development" else []
     cors_allow_credentials: bool = True
     cors_allow_methods: str = "GET,POST,PUT,DELETE,OPTIONS"
     cors_allow_headers: str = "Accept,Authorization,Content-Type,X-API-Key"

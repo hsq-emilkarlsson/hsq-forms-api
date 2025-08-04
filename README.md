@@ -15,6 +15,16 @@ This separation allows for:
 - Team autonomy
 - Better security isolation
 
+## Environments
+
+This project uses a clear separation between development and production environments:
+
+- **Development**: All resources have `-dev` suffix (e.g., `hsq-forms-api-dev`)
+- **Production**: Clean naming without suffixes (e.g., `hsq-forms-api`)
+
+See [Environment Management Guide](docs/ENVIRONMENT_MANAGEMENT.md) for details.
+- Better security isolation
+
 ## Key Features
 
 - **Flexible Form Schemas**: Create custom form templates with JSON Schema

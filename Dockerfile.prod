@@ -1,6 +1,9 @@
 # Multi-stage Dockerfile for optimized production builds
 FROM python:3.11-slim as builder
 
+# Build arguments
+ARG ENVIRONMENT=production
+
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
     build-essential \
@@ -35,6 +38,7 @@ COPY . .
 ENV PYTHONPATH=/app
 ENV PATH=/home/appuser/.local/bin:$PATH
 ENV PYTHONUNBUFFERED=1
+ENV APP_ENVIRONMENT=${ENVIRONMENT}
 
 # Change ownership to appuser
 RUN chown -R appuser:appuser /app

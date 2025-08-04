@@ -8,13 +8,15 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.prod
-    image: hsq-forms-api:${VERSION:-latest}
+      args:
+        ENVIRONMENT: production
+    image: hsqformsprodacr.azurecr.io/hsq-forms-api:${VERSION:-latest}
     container_name: hsq-forms-api-prod
     restart: unless-stopped
     ports:
       - "${API_PORT:-8000}:8000"
     environment:
-      - ENVIRONMENT=production
+      - APP_ENVIRONMENT=production
       - DATABASE_URL=postgresql://${DB_USER:-hsqforms}:${DB_PASSWORD}@db:5432/${DB_NAME:-hsqforms}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - SECRET_KEY=${SECRET_KEY}

@@ -1,0 +1,291 @@
+name: Deploy to Azure Container Apps
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:  # Allows manual triggering
+
+env:
+  # Common settings
+  AZURE_SUBSCRIPTION: c0b03b12-570f-4442-b337-c9175ad4037f
+  
+  # Development environment
+  DEV_REGISTRY: hsqformsdevacr.azurecr.io
+  DEV_IMAGE_NAME: hsq-forms-api-dev
+  DEV_RESOURCE_GROUP: rg-hsq-forms-dev
+  DEV_CONTAINER_APP: hsq-forms-api-dev
+  
+  # Production environment
+  PROD_REGISTRY: hsqformsprodacr.azurecr.io
+  PROD_IMAGE_NAME: hsq-forms-api
+  PROD_RESOURCE_GROUP: rg-hsq-forms-prod
+  PROD_CONTAINER_APP: hsq-forms-api
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_USER: testuser
+          POSTGRES_DB: testdb
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-dev.txt
+    
+    - name: Run tests
+      env:
+        DATABASE_URL: postgresql://testuser:testpass@localhost:5432/testdb
+        SECRET_KEY: test-secret-key
+      run: |
+        python -m pytest tests/ -v
+    
+    - name: Run linting
+      run: |
+        python -m flake8 src/ --max-line-length=100
+        python -m black --check src/
+
+  build-and-push-dev:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop' || github.event_name == 'workflow_dispatch'
+    
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Log in to Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+    
+    - name: Log in to Dev Container Registry
+      uses: azure/docker-login@v1
+      with:
+        login-server: ${{ env.DEV_REGISTRY }}
+        username: ${{ secrets.ACR_USERNAME }}
+        password: ${{ secrets.ACR_PASSWORD }}
+    
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.DEV_REGISTRY }}/${{ env.DEV_IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix=sha-
+          type=raw,value=latest
+    
+    - name: Build and push Docker image for DEV
+      id: build
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        platforms: linux/amd64
+        build-args: |
+          ENVIRONMENT=development
+
+  build-and-push-prod:
+    needs: test
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main'
+    
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Log in to Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+    
+    - name: Log in to Prod Container Registry
+      uses: azure/docker-login@v1
+      with:
+        login-server: ${{ env.PROD_REGISTRY }}
+        username: ${{ secrets.ACR_USERNAME }}
+        password: ${{ secrets.ACR_PASSWORD }}
+    
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.PROD_REGISTRY }}/${{ env.PROD_IMAGE_NAME }}
+        tags: |
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=raw,value=latest
+    
+    - name: Build and push Docker image for PROD
+      id: build
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile.prod
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        platforms: linux/amd64
+        build-args: |
+          ENVIRONMENT=production
+
+  deploy-to-dev:
+    needs: build-and-push-dev
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop' || github.event_name == 'workflow_dispatch'
+    environment: development
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Log in to Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+    
+    - name: Get image info
+      run: |
+        echo "Deploying image: ${{ needs.build-and-push-dev.outputs.image-tag }}"
+
+    - name: Deploy to Container App
+      uses: azure/CLI@v1
+      with:
+        inlineScript: |
+          az containerapp update \
+            --subscription ${{ env.AZURE_SUBSCRIPTION }} \
+            --resource-group ${{ env.DEV_RESOURCE_GROUP }} \
+            --name ${{ env.DEV_CONTAINER_APP }} \
+            --image ${{ needs.build-and-push-dev.outputs.image-tag }}
+
+    - name: Verify deployment
+      uses: azure/CLI@v1
+      with:
+        inlineScript: |
+          echo "Verifying deployment..."
+          REVISION=$(az containerapp revision list \
+            --subscription ${{ env.AZURE_SUBSCRIPTION }} \
+            --resource-group ${{ env.DEV_RESOURCE_GROUP }} \
+            --name ${{ env.DEV_CONTAINER_APP }} \
+            --query "[0].name" -o tsv)
+          echo "Latest revision: $REVISION"
+          
+          STATUS=$(az containerapp revision show \
+            --subscription ${{ env.AZURE_SUBSCRIPTION }} \
+            --resource-group ${{ env.DEV_RESOURCE_GROUP }} \
+            --name ${{ env.DEV_CONTAINER_APP }} \
+            --revision $REVISION \
+            --query "properties.status" -o tsv)
+          echo "Revision status: $STATUS"
+          
+          if [ "$STATUS" != "Running" ]; then
+            echo "Deployment not running. Checking logs..."
+            az containerapp logs show \
+              --subscription ${{ env.AZURE_SUBSCRIPTION }} \
+              --resource-group ${{ env.DEV_RESOURCE_GROUP }} \
+              --name ${{ env.DEV_CONTAINER_APP }} \
+              --revision $REVISION \
+              --tail 50
+            exit 1
+          fi
+          
+          echo "✅ Dev deployment successful!"
+
+  deploy-to-production:
+    needs: build-and-push-prod
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    environment: production
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Log in to Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+    
+    - name: Deploy to Production Container App
+      uses: azure/CLI@v1
+      with:
+        inlineScript: |
+          az containerapp update \
+            --subscription ${{ env.AZURE_SUBSCRIPTION }} \
+            --resource-group ${{ env.PROD_RESOURCE_GROUP }} \
+            --name ${{ env.PROD_CONTAINER_APP }} \
+            --image ${{ needs.build-and-push-prod.outputs.image-tag }}
+    
+    - name: Verify production deployment
+      uses: azure/CLI@v1
+      with:
+        inlineScript: |
+          echo "Verifying production deployment..."
+          REVISION=$(az containerapp revision list \
+            --subscription ${{ env.AZURE_SUBSCRIPTION }} \
+            --resource-group ${{ env.PROD_RESOURCE_GROUP }} \
+            --name ${{ env.PROD_CONTAINER_APP }} \
+            --query "[0].name" -o tsv)
+          
+          STATUS=$(az containerapp revision show \
+            --subscription ${{ env.AZURE_SUBSCRIPTION }} \
+            --resource-group ${{ env.PROD_RESOURCE_GROUP }} \
+            --name ${{ env.PROD_CONTAINER_APP }} \
+            --revision $REVISION \
+            --query "properties.status" -o tsv)
+            
+          if [ "$STATUS" != "Running" ]; then
+            echo "Production deployment not running. Checking logs..."
+            az containerapp logs show \
+              --subscription ${{ env.AZURE_SUBSCRIPTION }} \
+              --resource-group ${{ env.PROD_RESOURCE_GROUP }} \
+              --name ${{ env.PROD_CONTAINER_APP }} \
+              --revision $REVISION \
+              --tail 50
+            exit 1
+          fi
+          
+          echo "✅ Production deployment successful!"

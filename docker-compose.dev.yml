@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   postgres:
     image: postgres:15
@@ -23,6 +25,7 @@ services:
       dockerfile: Dockerfile
       args:
         ENVIRONMENT: development
+    image: hsqformsdevacr.azurecr.io/hsq-forms-api-dev:${VERSION:-latest}
     ports:
       - "8000:8000"
     environment:
@@ -37,10 +40,14 @@ services:
     command: ["uvicorn", "src.forms_api.app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     networks:
       - hsq-forms-network
+    volumes:
+      - ./src:/app/src
+      - ./tests:/app/tests
 
 volumes:
   postgres_data:
 
 networks:
   hsq-forms-network:
-    external: true
+    name: hsq-forms-network
+    driver: bridge
