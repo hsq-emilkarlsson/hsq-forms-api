@@ -153,13 +153,13 @@ async def test_form_specific_webhook(mock_client):
             template_id="test-template"
         )
         
-    # Assert that the form-specific URL was used
-            call_args = mock_client_instance.__aenter__.return_value.post.call_args
-            if call_args is not None:  # Handle the case when call_args is None in tests
-                assert call_args[0][0] == "https://example.com/form-specific"
-            else:
-                # In CI environment, the mock might not be called correctly
-                pytest.skip("Mock not called as expected in CI environment")
+        # Assert that the form-specific URL was used
+        call_args = mock_client_instance.__aenter__.return_value.post.call_args
+        if call_args is not None:  # Handle the case when call_args is None in tests
+            assert call_args[0][0] == "https://example.com/form-specific"
+        else:
+            # In CI environment, the mock might not be called correctly
+            pytest.skip("Mock not called as expected in CI environment")
 @pytest.mark.asyncio
 async def test_webhook_exception_handling():
     """Test that exceptions in webhook sending are properly handled."""
