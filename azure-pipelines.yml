@@ -60,17 +60,6 @@ stages:
       vmImage: 'ubuntu-latest'
     
     steps:
-    - task: AzureCLI@2
-      displayName: 'Login to ACR with Managed Identity'
-      inputs:
-        azureSubscription: 'hsq-forms-azure-connection'
-        scriptType: 'bash'
-        scriptLocation: 'inlineScript'
-        inlineScript: |
-          az login --identity
-          az account set --subscription $(azureSubscription)
-          az acr login --name hsqformsprodacr
-    
     - task: Docker@2
       displayName: 'Build and Push Prod Image'
       inputs:
@@ -83,43 +72,24 @@ stages:
           latest
         arguments: '--build-arg ENVIRONMENT=production'
 
-- stage: DeployProd
-  displayName: 'Deploy to Production'
+- stage: ImagePushed
+  displayName: 'Image Successfully Pushed'
   dependsOn: BuildProd
   condition: succeeded()
   jobs:
-  - deployment: DeployProdJob
-    displayName: 'Deploy to Prod Container App'
+  - job: NotifyJob
+    displayName: 'Notify Image Push Complete'
     pool:
       vmImage: 'ubuntu-latest'
-    environment: 'production'
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-          - task: AzureCLI@2
-            displayName: 'Deploy to Container App'
-            inputs:
-              azureSubscription: 'hsq-forms-azure-connection'
-              scriptType: 'bash'
-              scriptLocation: 'inlineScript'
-              addSpnToEnvironment: true
-              useGlobalConfig: true
-              inlineScript: |
-                # Använd Managed Identity för autentisering
-                echo "Logging in with Managed Identity..."
-                az login --identity
-                
-                # Sätt rätt subscription
-                az account set --subscription $(azureSubscription)
-                
-                IMAGE="$(prodRegistry)/$(prodImageName):latest"
-                echo "Deploying $IMAGE to $(prodContainerApp)"
-                
-                # Logga in till ACR med Managed Identity
-                az acr login --name hsqformsprodacr
-                
-                az containerapp update \
-                  --name $(prodContainerApp) \
-                  --resource-group $(prodResourceGroup) \
-                  --image $IMAGE
+    
+    steps:
+    - script: |
+        echo "✅ Docker image successfully pushed to $(prodRegistry)/$(prodImageName):latest"
+        echo "✅ Container App hsq-forms-api-v2 can now pull the updated image"
+        echo "🔄 Container App will automatically restart with new image if configured with continuous deployment"
+        echo ""
+        echo "📋 Next steps:"
+        echo "1. Verify image is available in ACR: $(prodRegistry)/$(prodImageName):latest"
+        echo "2. Container App hsq-forms-api-v2 should automatically detect and deploy new image"
+        echo "3. If manual restart needed, use Azure Portal or CLI to restart the Container App"
+      displayName: 'Deployment Summary'
