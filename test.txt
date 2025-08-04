@@ -1,1 +1,1 @@
-Mon Aug  4 19:35:26 UTC 2025: FINAL TEST with corrected credentials and propagation time
+🧪 HARDCODED TEST: GitHub secrets eliminated

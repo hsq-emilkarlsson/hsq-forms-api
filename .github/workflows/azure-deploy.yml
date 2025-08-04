@@ -96,8 +96,8 @@ jobs:
     - name: Azure CLI Login (Dev)
       uses: azure/login@v1
       with:
-        client-id: ${{ secrets.AZURE_CLIENT_ID }}
-        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        client-id: e94f6f81-7ac5-4b2a-a00f-e902caf63e64
+        tenant-id: 2a1c169e-715a-412b-b526-05da3f8412fa
         subscription-id: ${{ env.AZURE_SUBSCRIPTION }}
     
     # Hämta ACR access token för att kunna logga in på ACR
@@ -158,8 +158,8 @@ jobs:
     - name: Azure CLI Login (Prod)
       uses: azure/login@v1
       with:
-        client-id: ${{ secrets.AZURE_CLIENT_ID }}
-        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        client-id: e94f6f81-7ac5-4b2a-a00f-e902caf63e64
+        tenant-id: 2a1c169e-715a-412b-b526-05da3f8412fa
         subscription-id: ${{ env.AZURE_SUBSCRIPTION }}
     
     # Hämta ACR access token för att kunna logga in på ACR
@@ -212,8 +212,8 @@ jobs:
     - name: Azure CLI Login (Deploy Dev)
       uses: azure/login@v1
       with:
-        client-id: ${{ secrets.AZURE_CLIENT_ID }}
-        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        client-id: e94f6f81-7ac5-4b2a-a00f-e902caf63e64
+        tenant-id: 2a1c169e-715a-412b-b526-05da3f8412fa
         subscription-id: ${{ env.AZURE_SUBSCRIPTION }}
     
     - name: Deploy to Azure Container App (Dev)
@@ -239,8 +239,8 @@ jobs:
     - name: Azure CLI Login (Deploy Prod)
       uses: azure/login@v1
       with:
-        client-id: ${{ secrets.AZURE_CLIENT_ID }}
-        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        client-id: e94f6f81-7ac5-4b2a-a00f-e902caf63e64
+        tenant-id: 2a1c169e-715a-412b-b526-05da3f8412fa
         subscription-id: ${{ env.AZURE_SUBSCRIPTION }}
     
     - name: Deploy to Azure Container App (Prod)
