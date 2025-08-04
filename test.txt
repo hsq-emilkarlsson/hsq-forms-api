@@ -1,1 +1,1 @@
-🧪 HARDCODED TEST: GitHub secrets eliminated
+🚀 SERVICE PRINCIPAL TEST: Classic Azure authentication

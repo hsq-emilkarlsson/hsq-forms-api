@@ -1,10 +1,9 @@
 name: Deploy to Azure Container Apps
 
-# Using Managed Identity for Container Apps deployment
-# Test deployment with fixed federated credentials for both develop and main branches
-# Verified GitHub secrets are correctly configured
-# Fixed tenant ID: 2a1c169e-715a-412b-b526-05da3f8412fa
-# Fixed client ID: e94f6f81-7ac5-4b2a-a00f-e902caf63e64
+# Using Service Principal with Client Secret for Azure authentication
+# Service Principal ID: 6213e529-a8f0-41bc-8818-feeca0a79334
+# Switched from OIDC to classic authentication due to App Registration issues
+# AZURE_CREDENTIALS secret contains: clientId, clientSecret, tenantId, subscriptionId
 on:
   push:
     branches: [ main, develop ]
@@ -14,7 +13,6 @@ on:
   workflow_dispatch:  # Allows manual triggering
 
 permissions:
-  id-token: write
   contents: read
 
 env:
@@ -96,9 +94,7 @@ jobs:
     - name: Azure CLI Login (Dev)
       uses: azure/login@v1
       with:
-        client-id: e94f6f81-7ac5-4b2a-a00f-e902caf63e64
-        tenant-id: 2a1c169e-715a-412b-b526-05da3f8412fa
-        subscription-id: ${{ env.AZURE_SUBSCRIPTION }}
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
     
     # Hämta ACR access token för att kunna logga in på ACR
     - name: Get ACR Access Token
@@ -158,9 +154,7 @@ jobs:
     - name: Azure CLI Login (Prod)
       uses: azure/login@v1
       with:
-        client-id: e94f6f81-7ac5-4b2a-a00f-e902caf63e64
-        tenant-id: 2a1c169e-715a-412b-b526-05da3f8412fa
-        subscription-id: ${{ env.AZURE_SUBSCRIPTION }}
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
     
     # Hämta ACR access token för att kunna logga in på ACR
     - name: Get ACR Access Token
@@ -212,9 +206,7 @@ jobs:
     - name: Azure CLI Login (Deploy Dev)
       uses: azure/login@v1
       with:
-        client-id: e94f6f81-7ac5-4b2a-a00f-e902caf63e64
-        tenant-id: 2a1c169e-715a-412b-b526-05da3f8412fa
-        subscription-id: ${{ env.AZURE_SUBSCRIPTION }}
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
     
     - name: Deploy to Azure Container App (Dev)
       run: |
@@ -239,9 +231,7 @@ jobs:
     - name: Azure CLI Login (Deploy Prod)
       uses: azure/login@v1
       with:
-        client-id: e94f6f81-7ac5-4b2a-a00f-e902caf63e64
-        tenant-id: 2a1c169e-715a-412b-b526-05da3f8412fa
-        subscription-id: ${{ env.AZURE_SUBSCRIPTION }}
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
     
     - name: Deploy to Azure Container App (Prod)
       run: |
