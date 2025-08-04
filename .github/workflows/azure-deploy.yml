@@ -82,25 +82,99 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
     
-    - name: Log in to Azure
-      uses: azure/login@v1
-      with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }}
-      continue-on-error: true
-        
-    - name: Fallback Azure login with client credentials if AZURE_CREDENTIALS JSON fails
-      if: ${{ failure() }}
-      uses: azure/login@v1
-      with:
-        client-id: ${{ secrets.AZURE_CLIENT_ID }}
-        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-        subscription-id: ${{ env.AZURE_SUBSCRIPTION }}
+    - name: Azure CLI Login (Dev)
+      run: |
+        # Installera jq om det inte redan finns
+        if ! command -v jq &> /dev/null; then
+          sudo apt-get update
+          sudo apt-get install -y jq
+        fi
+
+        # Försök logga in med direkt angivna uppgifter om de finns
+        if [[ -n "${{ secrets.AZURE_CLIENT_ID }}" && -n "${{ secrets.AZURE_TENANT_ID }}" && -n "${{ secrets.AZURE_CLIENT_SECRET }}" ]]; then
+          echo "Logging in with explicit client credentials"
+          az login --service-principal --username "${{ secrets.AZURE_CLIENT_ID }}" --tenant "${{ secrets.AZURE_TENANT_ID }}" --password "${{ secrets.AZURE_CLIENT_SECRET }}"
+          az account set --subscription "${{ env.AZURE_SUBSCRIPTION }}"
+          echo "Azure CLI login successful with explicit credentials"
+        # Om det inte finns explicita uppgifter, försök med AZURE_CREDENTIALS JSON
+        elif [[ -n "${{ secrets.AZURE_CREDENTIALS }}" ]]; then
+          echo "Trying to login with AZURE_CREDENTIALS JSON"
+          # Skapa temporär fil för JSON-data
+          echo '${{ secrets.AZURE_CREDENTIALS }}' > azure_credentials.json
+          
+          # Kontrollera att JSON-filen är giltig
+          if ! jq . azure_credentials.json > /dev/null 2>&1; then
+            echo "Error: AZURE_CREDENTIALS is not valid JSON"
+            cat azure_credentials.json
+            rm azure_credentials.json
+            exit 1
+          fi
+          
+          # Extrahera värden och logga in
+          CLIENT_ID=$(jq -r '.clientId // .appId' azure_credentials.json)
+          CLIENT_SECRET=$(jq -r '.clientSecret // .password' azure_credentials.json)
+          TENANT_ID=$(jq -r '.tenantId' azure_credentials.json)
+          
+          if [[ -z "$CLIENT_ID" || -z "$CLIENT_SECRET" || -z "$TENANT_ID" || "$CLIENT_ID" == "null" || "$CLIENT_SECRET" == "null" || "$TENANT_ID" == "null" ]]; then
+            echo "Error: Could not extract required values from AZURE_CREDENTIALS"
+            echo "Make sure AZURE_CREDENTIALS contains clientId/appId, clientSecret/password, and tenantId"
+            rm azure_credentials.json
+            exit 1
+          fi
+          
+          # Försök logga in
+          az login --service-principal --username "$CLIENT_ID" --password "$CLIENT_SECRET" --tenant "$TENANT_ID"
+          LOGIN_STATUS=$?
+          
+          # Ta bort den temporära filen
+          rm azure_credentials.json
+          
+          if [[ $LOGIN_STATUS -ne 0 ]]; then
+            echo "Failed to login with AZURE_CREDENTIALS JSON"
+            exit 1
+          fi
+          
+          az account set --subscription "${{ env.AZURE_SUBSCRIPTION }}"
+          echo "Azure CLI login successful with AZURE_CREDENTIALS JSON"
+        else
+          echo "No valid Azure credentials found. Please set either AZURE_CREDENTIALS JSON or individual AZURE_CLIENT_ID, AZURE_TENANT_ID, and AZURE_CLIENT_SECRET."
+          exit 1
+        fi
     
     # Hämta ACR access token för att kunna logga in på ACR
     - name: Get ACR Access Token
       id: get-acr-token
       run: |
-        TOKEN=$(az acr login --name ${{ env.DEV_REGISTRY }} --expose-token --output tsv --query accessToken)
+        # Kontrollera om vi redan är inloggad i Azure
+        if ! az account show &>/dev/null; then
+          echo "Not logged in to Azure CLI. Cannot get ACR token."
+          exit 1
+        fi
+        
+        # Försök hämta token med fallback för felhantering
+        set +e  # Tillåt kommandon att misslyckas utan att avsluta skriptet
+        TOKEN=$(az acr login --name ${{ env.DEV_REGISTRY }} --expose-token --output tsv --query accessToken 2>/dev/null)
+        ACR_STATUS=$?
+        set -e  # Återställ normal felhantering
+        
+        if [[ $ACR_STATUS -ne 0 || -z "$TOKEN" ]]; then
+          echo "Failed to get ACR token directly. Trying with managed identity..."
+          
+          # Försök med managed identity
+          MANAGED_TOKEN=$(az account get-access-token --resource https://management.azure.com/ --query accessToken -o tsv)
+          if [[ -n "$MANAGED_TOKEN" ]]; then
+            echo "Got managed identity token. Using it for ACR access."
+            TOKEN=$(curl -X POST -H "Content-Type: application/json" -H "Authorization: Bearer $MANAGED_TOKEN" \
+                  "https://management.azure.com/subscriptions/${{ env.AZURE_SUBSCRIPTION }}/resourceGroups/${{ env.DEV_RESOURCE_GROUP }}/providers/Microsoft.ContainerRegistry/registries/$(echo ${{ env.DEV_REGISTRY }} | cut -d. -f1)/listCredentials?api-version=2023-01-01-preview" | \
+                  jq -r '.accessToken')
+          fi
+        fi
+        
+        if [[ -z "$TOKEN" ]]; then
+          echo "Could not obtain ACR token. Exiting."
+          exit 1
+        fi
+        
         echo "::add-mask::$TOKEN"
         echo "token=$TOKEN" >> $GITHUB_OUTPUT
     
@@ -151,25 +225,99 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
     
-    - name: Log in to Azure
-      uses: azure/login@v1
-      with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }}
-      continue-on-error: true
-        
-    - name: Fallback Azure login with client credentials if AZURE_CREDENTIALS JSON fails
-      if: ${{ failure() }}
-      uses: azure/login@v1
-      with:
-        client-id: ${{ secrets.AZURE_CLIENT_ID }}
-        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-        subscription-id: ${{ env.AZURE_SUBSCRIPTION }}
+    - name: Azure CLI Login (Prod)
+      run: |
+        # Installera jq om det inte redan finns
+        if ! command -v jq &> /dev/null; then
+          sudo apt-get update
+          sudo apt-get install -y jq
+        fi
+
+        # Försök logga in med direkt angivna uppgifter om de finns
+        if [[ -n "${{ secrets.AZURE_CLIENT_ID }}" && -n "${{ secrets.AZURE_TENANT_ID }}" && -n "${{ secrets.AZURE_CLIENT_SECRET }}" ]]; then
+          echo "Logging in with explicit client credentials"
+          az login --service-principal --username "${{ secrets.AZURE_CLIENT_ID }}" --tenant "${{ secrets.AZURE_TENANT_ID }}" --password "${{ secrets.AZURE_CLIENT_SECRET }}"
+          az account set --subscription "${{ env.AZURE_SUBSCRIPTION }}"
+          echo "Azure CLI login successful with explicit credentials"
+        # Om det inte finns explicita uppgifter, försök med AZURE_CREDENTIALS JSON
+        elif [[ -n "${{ secrets.AZURE_CREDENTIALS }}" ]]; then
+          echo "Trying to login with AZURE_CREDENTIALS JSON"
+          # Skapa temporär fil för JSON-data
+          echo '${{ secrets.AZURE_CREDENTIALS }}' > azure_credentials.json
+          
+          # Kontrollera att JSON-filen är giltig
+          if ! jq . azure_credentials.json > /dev/null 2>&1; then
+            echo "Error: AZURE_CREDENTIALS is not valid JSON"
+            cat azure_credentials.json
+            rm azure_credentials.json
+            exit 1
+          fi
+          
+          # Extrahera värden och logga in
+          CLIENT_ID=$(jq -r '.clientId // .appId' azure_credentials.json)
+          CLIENT_SECRET=$(jq -r '.clientSecret // .password' azure_credentials.json)
+          TENANT_ID=$(jq -r '.tenantId' azure_credentials.json)
+          
+          if [[ -z "$CLIENT_ID" || -z "$CLIENT_SECRET" || -z "$TENANT_ID" || "$CLIENT_ID" == "null" || "$CLIENT_SECRET" == "null" || "$TENANT_ID" == "null" ]]; then
+            echo "Error: Could not extract required values from AZURE_CREDENTIALS"
+            echo "Make sure AZURE_CREDENTIALS contains clientId/appId, clientSecret/password, and tenantId"
+            rm azure_credentials.json
+            exit 1
+          fi
+          
+          # Försök logga in
+          az login --service-principal --username "$CLIENT_ID" --password "$CLIENT_SECRET" --tenant "$TENANT_ID"
+          LOGIN_STATUS=$?
+          
+          # Ta bort den temporära filen
+          rm azure_credentials.json
+          
+          if [[ $LOGIN_STATUS -ne 0 ]]; then
+            echo "Failed to login with AZURE_CREDENTIALS JSON"
+            exit 1
+          fi
+          
+          az account set --subscription "${{ env.AZURE_SUBSCRIPTION }}"
+          echo "Azure CLI login successful with AZURE_CREDENTIALS JSON"
+        else
+          echo "No valid Azure credentials found. Please set either AZURE_CREDENTIALS JSON or individual AZURE_CLIENT_ID, AZURE_TENANT_ID, and AZURE_CLIENT_SECRET."
+          exit 1
+        fi
     
     # Hämta ACR access token för att kunna logga in på ACR
-    - name: Get ACR Access Token
+    - name: Get ACR Access Token (Prod)
       id: get-acr-token-prod
       run: |
-        TOKEN=$(az acr login --name ${{ env.PROD_REGISTRY }} --expose-token --output tsv --query accessToken)
+        # Kontrollera om vi redan är inloggad i Azure
+        if ! az account show &>/dev/null; then
+          echo "Not logged in to Azure CLI. Cannot get ACR token."
+          exit 1
+        fi
+        
+        # Försök hämta token med fallback för felhantering
+        set +e  # Tillåt kommandon att misslyckas utan att avsluta skriptet
+        TOKEN=$(az acr login --name ${{ env.PROD_REGISTRY }} --expose-token --output tsv --query accessToken 2>/dev/null)
+        ACR_STATUS=$?
+        set -e  # Återställ normal felhantering
+        
+        if [[ $ACR_STATUS -ne 0 || -z "$TOKEN" ]]; then
+          echo "Failed to get ACR token directly. Trying with managed identity..."
+          
+          # Försök med managed identity
+          MANAGED_TOKEN=$(az account get-access-token --resource https://management.azure.com/ --query accessToken -o tsv)
+          if [[ -n "$MANAGED_TOKEN" ]]; then
+            echo "Got managed identity token. Using it for ACR access."
+            TOKEN=$(curl -X POST -H "Content-Type: application/json" -H "Authorization: Bearer $MANAGED_TOKEN" \
+                  "https://management.azure.com/subscriptions/${{ env.AZURE_SUBSCRIPTION }}/resourceGroups/${{ env.PROD_RESOURCE_GROUP }}/providers/Microsoft.ContainerRegistry/registries/$(echo ${{ env.PROD_REGISTRY }} | cut -d. -f1)/listCredentials?api-version=2023-01-01-preview" | \
+                  jq -r '.accessToken')
+          fi
+        fi
+        
+        if [[ -z "$TOKEN" ]]; then
+          echo "Could not obtain ACR token. Exiting."
+          exit 1
+        fi
+        
         echo "::add-mask::$TOKEN"
         echo "token=$TOKEN" >> $GITHUB_OUTPUT
     
@@ -213,66 +361,107 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Log in to Azure
-      uses: azure/login@v1
-      with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }}
-      continue-on-error: true
-        
-    - name: Fallback Azure login with client credentials if AZURE_CREDENTIALS JSON fails
-      if: ${{ failure() }}
-      uses: azure/login@v1
-      with:
-        client-id: ${{ secrets.AZURE_CLIENT_ID }}
-        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-        subscription-id: ${{ env.AZURE_SUBSCRIPTION }}
+    - name: Azure CLI Login (Deploy Dev)
+      run: |
+        # Installera jq om det inte redan finns
+        if ! command -v jq &> /dev/null; then
+          sudo apt-get update
+          sudo apt-get install -y jq
+        fi
+
+        # Försök logga in med direkt angivna uppgifter om de finns
+        if [[ -n "${{ secrets.AZURE_CLIENT_ID }}" && -n "${{ secrets.AZURE_TENANT_ID }}" && -n "${{ secrets.AZURE_CLIENT_SECRET }}" ]]; then
+          echo "Logging in with explicit client credentials"
+          az login --service-principal --username "${{ secrets.AZURE_CLIENT_ID }}" --tenant "${{ secrets.AZURE_TENANT_ID }}" --password "${{ secrets.AZURE_CLIENT_SECRET }}"
+          az account set --subscription "${{ env.AZURE_SUBSCRIPTION }}"
+          echo "Azure CLI login successful with explicit credentials"
+        # Om det inte finns explicita uppgifter, försök med AZURE_CREDENTIALS JSON
+        elif [[ -n "${{ secrets.AZURE_CREDENTIALS }}" ]]; then
+          echo "Trying to login with AZURE_CREDENTIALS JSON"
+          # Skapa temporär fil för JSON-data
+          echo '${{ secrets.AZURE_CREDENTIALS }}' > azure_credentials.json
+          
+          # Kontrollera att JSON-filen är giltig
+          if ! jq . azure_credentials.json > /dev/null 2>&1; then
+            echo "Error: AZURE_CREDENTIALS is not valid JSON"
+            cat azure_credentials.json
+            rm azure_credentials.json
+            exit 1
+          fi
+          
+          # Extrahera värden och logga in
+          CLIENT_ID=$(jq -r '.clientId // .appId' azure_credentials.json)
+          CLIENT_SECRET=$(jq -r '.clientSecret // .password' azure_credentials.json)
+          TENANT_ID=$(jq -r '.tenantId' azure_credentials.json)
+          
+          if [[ -z "$CLIENT_ID" || -z "$CLIENT_SECRET" || -z "$TENANT_ID" || "$CLIENT_ID" == "null" || "$CLIENT_SECRET" == "null" || "$TENANT_ID" == "null" ]]; then
+            echo "Error: Could not extract required values from AZURE_CREDENTIALS"
+            echo "Make sure AZURE_CREDENTIALS contains clientId/appId, clientSecret/password, and tenantId"
+            rm azure_credentials.json
+            exit 1
+          fi
+          
+          # Försök logga in
+          az login --service-principal --username "$CLIENT_ID" --password "$CLIENT_SECRET" --tenant "$TENANT_ID"
+          LOGIN_STATUS=$?
+          
+          # Ta bort den temporära filen
+          rm azure_credentials.json
+          
+          if [[ $LOGIN_STATUS -ne 0 ]]; then
+            echo "Failed to login with AZURE_CREDENTIALS JSON"
+            exit 1
+          fi
+          
+          az account set --subscription "${{ env.AZURE_SUBSCRIPTION }}"
+          echo "Azure CLI login successful with AZURE_CREDENTIALS JSON"
+        else
+          echo "No valid Azure credentials found. Please set either AZURE_CREDENTIALS JSON or individual AZURE_CLIENT_ID, AZURE_TENANT_ID, and AZURE_CLIENT_SECRET."
+          exit 1
+        fi
     
     - name: Get image info
       run: |
         echo "Deploying image: ${{ needs.build-and-push-dev.outputs.image-tag }}"
 
     - name: Deploy to Container App
-      uses: azure/CLI@v1
-      with:
-        inlineScript: |
-          az containerapp update \
-            --subscription ${{ env.AZURE_SUBSCRIPTION }} \
-            --resource-group ${{ env.DEV_RESOURCE_GROUP }} \
-            --name ${{ env.DEV_CONTAINER_APP }} \
-            --image ${{ needs.build-and-push-dev.outputs.image-tag }}
+      run: |
+        az containerapp update \
+          --subscription ${{ env.AZURE_SUBSCRIPTION }} \
+          --resource-group ${{ env.DEV_RESOURCE_GROUP }} \
+          --name ${{ env.DEV_CONTAINER_APP }} \
+          --image ${{ needs.build-and-push-dev.outputs.image-tag }}
 
     - name: Verify deployment
-      uses: azure/CLI@v1
-      with:
-        inlineScript: |
-          echo "Verifying deployment..."
-          REVISION=$(az containerapp revision list \
-            --subscription ${{ env.AZURE_SUBSCRIPTION }} \
-            --resource-group ${{ env.DEV_RESOURCE_GROUP }} \
-            --name ${{ env.DEV_CONTAINER_APP }} \
-            --query "[0].name" -o tsv)
-          echo "Latest revision: $REVISION"
-          
-          STATUS=$(az containerapp revision show \
+      run: |
+        echo "Verifying deployment..."
+        REVISION=$(az containerapp revision list \
+          --subscription ${{ env.AZURE_SUBSCRIPTION }} \
+          --resource-group ${{ env.DEV_RESOURCE_GROUP }} \
+          --name ${{ env.DEV_CONTAINER_APP }} \
+          --query "[0].name" -o tsv)
+        echo "Latest revision: $REVISION"
+        
+        STATUS=$(az containerapp revision show \
+          --subscription ${{ env.AZURE_SUBSCRIPTION }} \
+          --resource-group ${{ env.DEV_RESOURCE_GROUP }} \
+          --name ${{ env.DEV_CONTAINER_APP }} \
+          --revision $REVISION \
+          --query "properties.status" -o tsv)
+        echo "Revision status: $STATUS"
+        
+        if [ "$STATUS" != "Running" ]; then
+          echo "Deployment not running. Checking logs..."
+          az containerapp logs show \
             --subscription ${{ env.AZURE_SUBSCRIPTION }} \
             --resource-group ${{ env.DEV_RESOURCE_GROUP }} \
             --name ${{ env.DEV_CONTAINER_APP }} \
             --revision $REVISION \
-            --query "properties.status" -o tsv)
-          echo "Revision status: $STATUS"
-          
-          if [ "$STATUS" != "Running" ]; then
-            echo "Deployment not running. Checking logs..."
-            az containerapp logs show \
-              --subscription ${{ env.AZURE_SUBSCRIPTION }} \
-              --resource-group ${{ env.DEV_RESOURCE_GROUP }} \
-              --name ${{ env.DEV_CONTAINER_APP }} \
-              --revision $REVISION \
-              --tail 50
-            exit 1
-          fi
-          
-          echo "✅ Dev deployment successful!"
+            --tail 50
+          exit 1
+        fi
+        
+        echo "✅ Dev deployment successful!"
 
   deploy-to-production:
     needs: build-and-push-prod
@@ -283,57 +472,98 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Log in to Azure
-      uses: azure/login@v1
-      with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }}
-      continue-on-error: true
-        
-    - name: Fallback Azure login with client credentials if AZURE_CREDENTIALS JSON fails
-      if: ${{ failure() }}
-      uses: azure/login@v1
-      with:
-        client-id: ${{ secrets.AZURE_CLIENT_ID }}
-        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-        subscription-id: ${{ env.AZURE_SUBSCRIPTION }}
+    - name: Azure CLI Login (Deploy Prod)
+      run: |
+        # Installera jq om det inte redan finns
+        if ! command -v jq &> /dev/null; then
+          sudo apt-get update
+          sudo apt-get install -y jq
+        fi
+
+        # Försök logga in med direkt angivna uppgifter om de finns
+        if [[ -n "${{ secrets.AZURE_CLIENT_ID }}" && -n "${{ secrets.AZURE_TENANT_ID }}" && -n "${{ secrets.AZURE_CLIENT_SECRET }}" ]]; then
+          echo "Logging in with explicit client credentials"
+          az login --service-principal --username "${{ secrets.AZURE_CLIENT_ID }}" --tenant "${{ secrets.AZURE_TENANT_ID }}" --password "${{ secrets.AZURE_CLIENT_SECRET }}"
+          az account set --subscription "${{ env.AZURE_SUBSCRIPTION }}"
+          echo "Azure CLI login successful with explicit credentials"
+        # Om det inte finns explicita uppgifter, försök med AZURE_CREDENTIALS JSON
+        elif [[ -n "${{ secrets.AZURE_CREDENTIALS }}" ]]; then
+          echo "Trying to login with AZURE_CREDENTIALS JSON"
+          # Skapa temporär fil för JSON-data
+          echo '${{ secrets.AZURE_CREDENTIALS }}' > azure_credentials.json
+          
+          # Kontrollera att JSON-filen är giltig
+          if ! jq . azure_credentials.json > /dev/null 2>&1; then
+            echo "Error: AZURE_CREDENTIALS is not valid JSON"
+            cat azure_credentials.json
+            rm azure_credentials.json
+            exit 1
+          fi
+          
+          # Extrahera värden och logga in
+          CLIENT_ID=$(jq -r '.clientId // .appId' azure_credentials.json)
+          CLIENT_SECRET=$(jq -r '.clientSecret // .password' azure_credentials.json)
+          TENANT_ID=$(jq -r '.tenantId' azure_credentials.json)
+          
+          if [[ -z "$CLIENT_ID" || -z "$CLIENT_SECRET" || -z "$TENANT_ID" || "$CLIENT_ID" == "null" || "$CLIENT_SECRET" == "null" || "$TENANT_ID" == "null" ]]; then
+            echo "Error: Could not extract required values from AZURE_CREDENTIALS"
+            echo "Make sure AZURE_CREDENTIALS contains clientId/appId, clientSecret/password, and tenantId"
+            rm azure_credentials.json
+            exit 1
+          fi
+          
+          # Försök logga in
+          az login --service-principal --username "$CLIENT_ID" --password "$CLIENT_SECRET" --tenant "$TENANT_ID"
+          LOGIN_STATUS=$?
+          
+          # Ta bort den temporära filen
+          rm azure_credentials.json
+          
+          if [[ $LOGIN_STATUS -ne 0 ]]; then
+            echo "Failed to login with AZURE_CREDENTIALS JSON"
+            exit 1
+          fi
+          
+          az account set --subscription "${{ env.AZURE_SUBSCRIPTION }}"
+          echo "Azure CLI login successful with AZURE_CREDENTIALS JSON"
+        else
+          echo "No valid Azure credentials found. Please set either AZURE_CREDENTIALS JSON or individual AZURE_CLIENT_ID, AZURE_TENANT_ID, and AZURE_CLIENT_SECRET."
+          exit 1
+        fi
     
     - name: Deploy to Production Container App
-      uses: azure/CLI@v1
-      with:
-        inlineScript: |
-          az containerapp update \
-            --subscription ${{ env.AZURE_SUBSCRIPTION }} \
-            --resource-group ${{ env.PROD_RESOURCE_GROUP }} \
-            --name ${{ env.PROD_CONTAINER_APP }} \
-            --image ${{ needs.build-and-push-prod.outputs.image-tag }}
+      run: |
+        az containerapp update \
+          --subscription ${{ env.AZURE_SUBSCRIPTION }} \
+          --resource-group ${{ env.PROD_RESOURCE_GROUP }} \
+          --name ${{ env.PROD_CONTAINER_APP }} \
+          --image ${{ needs.build-and-push-prod.outputs.image-tag }}
     
     - name: Verify production deployment
-      uses: azure/CLI@v1
-      with:
-        inlineScript: |
-          echo "Verifying production deployment..."
-          REVISION=$(az containerapp revision list \
-            --subscription ${{ env.AZURE_SUBSCRIPTION }} \
-            --resource-group ${{ env.PROD_RESOURCE_GROUP }} \
-            --name ${{ env.PROD_CONTAINER_APP }} \
-            --query "[0].name" -o tsv)
+      run: |
+        echo "Verifying production deployment..."
+        REVISION=$(az containerapp revision list \
+          --subscription ${{ env.AZURE_SUBSCRIPTION }} \
+          --resource-group ${{ env.PROD_RESOURCE_GROUP }} \
+          --name ${{ env.PROD_CONTAINER_APP }} \
+          --query "[0].name" -o tsv)
+        
+        STATUS=$(az containerapp revision show \
+          --subscription ${{ env.AZURE_SUBSCRIPTION }} \
+          --resource-group ${{ env.PROD_RESOURCE_GROUP }} \
+          --name ${{ env.PROD_CONTAINER_APP }} \
+          --revision $REVISION \
+          --query "properties.status" -o tsv)
           
-          STATUS=$(az containerapp revision show \
+        if [ "$STATUS" != "Running" ]; then
+          echo "Production deployment not running. Checking logs..."
+          az containerapp logs show \
             --subscription ${{ env.AZURE_SUBSCRIPTION }} \
             --resource-group ${{ env.PROD_RESOURCE_GROUP }} \
             --name ${{ env.PROD_CONTAINER_APP }} \
             --revision $REVISION \
-            --query "properties.status" -o tsv)
-            
-          if [ "$STATUS" != "Running" ]; then
-            echo "Production deployment not running. Checking logs..."
-            az containerapp logs show \
-              --subscription ${{ env.AZURE_SUBSCRIPTION }} \
-              --resource-group ${{ env.PROD_RESOURCE_GROUP }} \
-              --name ${{ env.PROD_CONTAINER_APP }} \
-              --revision $REVISION \
-              --tail 50
-            exit 1
-          fi
-          
-          echo "✅ Production deployment successful!"
+            --tail 50
+          exit 1
+        fi
+        
+        echo "✅ Production deployment successful!"
