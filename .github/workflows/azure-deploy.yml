@@ -85,6 +85,13 @@ jobs:
     - name: Log in to Azure
       uses: azure/login@v1
       with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+      continue-on-error: true
+        
+    - name: Fallback Azure login with client credentials if AZURE_CREDENTIALS JSON fails
+      if: ${{ failure() }}
+      uses: azure/login@v1
+      with:
         client-id: ${{ secrets.AZURE_CLIENT_ID }}
         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
         subscription-id: ${{ env.AZURE_SUBSCRIPTION }}
@@ -147,6 +154,13 @@ jobs:
     - name: Log in to Azure
       uses: azure/login@v1
       with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+      continue-on-error: true
+        
+    - name: Fallback Azure login with client credentials if AZURE_CREDENTIALS JSON fails
+      if: ${{ failure() }}
+      uses: azure/login@v1
+      with:
         client-id: ${{ secrets.AZURE_CLIENT_ID }}
         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
         subscription-id: ${{ env.AZURE_SUBSCRIPTION }}
@@ -200,6 +214,13 @@ jobs:
     - uses: actions/checkout@v4
     
     - name: Log in to Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+      continue-on-error: true
+        
+    - name: Fallback Azure login with client credentials if AZURE_CREDENTIALS JSON fails
+      if: ${{ failure() }}
       uses: azure/login@v1
       with:
         client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -263,6 +284,13 @@ jobs:
     - uses: actions/checkout@v4
     
     - name: Log in to Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+      continue-on-error: true
+        
+    - name: Fallback Azure login with client credentials if AZURE_CREDENTIALS JSON fails
+      if: ${{ failure() }}
       uses: azure/login@v1
       with:
         client-id: ${{ secrets.AZURE_CLIENT_ID }}
