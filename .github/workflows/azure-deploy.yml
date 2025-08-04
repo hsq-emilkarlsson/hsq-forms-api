@@ -1,6 +1,7 @@
 name: Deploy to Azure Container Apps
 
 # Using Managed Identity for Container Apps deployment
+# Test deployment with fixed federated credentials for both develop and main branches
 on:
   push:
     branches: [ main, develop ]
