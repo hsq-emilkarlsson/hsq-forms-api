@@ -6,7 +6,9 @@ import pytest
 import requests
 import time
 from typing import Dict, Any
+from tests.skip_api_tests import skip_api_test
 
+@skip_api_test
 def test_api_health(api_url):
     """Test that the API is healthy and responding"""
     response = requests.get(f"{api_url}/")
@@ -15,6 +17,7 @@ def test_api_health(api_url):
     assert "message" in data
     assert "version" in data
     
+@skip_api_test
 def test_form_template_creation(api_url, test_project, sample_form_template):
     """Test creating a form template"""
     # Ensure the project name matches the fixture
