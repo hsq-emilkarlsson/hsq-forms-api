@@ -182,8 +182,8 @@ async def test_webhook_exception_handling():
             form_data={"test": "data"}
         )
         
-            # Assert
-            assert len(results) == 1
-            assert results[0]["success"] == False
-            # Test exception innehåller antingen "Test exception" eller något annat felmeddelande i CI
-            assert "exception" in results[0]["error"].lower() or "magicmock" in results[0]["error"].lower()
+        # Assert
+        assert len(results) == 1
+        assert results[0]["success"] == False
+        # Test exception innehåller antingen "Test exception" eller något annat felmeddelande i CI
+        assert "exception" in results[0]["error"].lower() or "magicmock" in results[0]["error"].lower()
