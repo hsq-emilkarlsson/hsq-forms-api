@@ -4,6 +4,7 @@ name: Deploy to Azure Container Apps
 # Test deployment with fixed federated credentials for both develop and main branches
 # Verified GitHub secrets are correctly configured
 # Fixed tenant ID: 2a1c169e-715a-412b-b526-05da3f8412fa
+# Fixed client ID: e94f6f81-7ac5-4b2a-a00f-e902caf63e64
 on:
   push:
     branches: [ main, develop ]
