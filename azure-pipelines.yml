@@ -17,10 +17,10 @@ pr:
 
 variables:
   azureSubscription: 'c0b03b12-570f-4442-b337-c9175ad4037f'
-  devRegistry: 'hsqformsdevacr.azurecr.io'
-  devImageName: 'hsq-forms-api-dev'
-  devResourceGroup: 'rg-hsq-forms-dev'
-  devContainerApp: 'hsq-forms-api-dev'
+  prodRegistry: 'hsqformsprodacr.azurecr.io'
+  prodImageName: 'hsq-forms-api-v2'
+  prodResourceGroup: 'rg-hsq-forms-prod-westeu'
+  prodContainerApp: 'hsq-forms-api-v2'
 
 stages:
 - stage: Test
@@ -49,45 +49,50 @@ stages:
         python -c "print('Basic test passed')"
       displayName: 'Run basic tests'
 
-- stage: BuildDev
-  displayName: 'Build & Push Development'
+- stage: BuildProd
+  displayName: 'Build & Push Production'
   dependsOn: Test
-  condition: and(succeeded(), or(eq(variables['Build.SourceBranch'], 'refs/heads/develop'), eq(variables['Build.Reason'], 'Manual')))
+  condition: and(succeeded(), or(eq(variables['Build.SourceBranch'], 'refs/heads/main'), eq(variables['Build.Reason'], 'Manual')))
   jobs:
-  - job: BuildDevJob
-    displayName: 'Build and Push Dev Image'
+  - job: BuildProdJob
+    displayName: 'Build and Push Prod Image'
     pool:
       vmImage: 'ubuntu-latest'
     
     steps:
-    - task: Docker@2
-      displayName: 'Login to ACR'
+    - task: AzureCLI@2
+      displayName: 'Login to ACR with Managed Identity'
       inputs:
-        command: 'login'
-        containerRegistry: 'hsq-forms-dev-acr'
+        azureSubscription: 'hsq-forms-azure-connection'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          az login --identity
+          az account set --subscription $(azureSubscription)
+          az acr login --name hsqformsprodacr
     
     - task: Docker@2
-      displayName: 'Build and Push Dev Image'
+      displayName: 'Build and Push Prod Image'
       inputs:
         command: 'buildAndPush'
-        repository: '$(devImageName)'
+        repository: '$(prodImageName)'
         dockerfile: './Dockerfile'
-        containerRegistry: 'hsq-forms-dev-acr'
+        containerRegistry: 'hsq-forms-prod-acr'
         tags: |
           $(Build.BuildNumber)
           latest
-        arguments: '--build-arg ENVIRONMENT=development'
+        arguments: '--build-arg ENVIRONMENT=production'
 
-- stage: DeployDev
-  displayName: 'Deploy to Development'
-  dependsOn: BuildDev
+- stage: DeployProd
+  displayName: 'Deploy to Production'
+  dependsOn: BuildProd
   condition: succeeded()
   jobs:
-  - deployment: DeployDevJob
-    displayName: 'Deploy to Dev Container App'
+  - deployment: DeployProdJob
+    displayName: 'Deploy to Prod Container App'
     pool:
       vmImage: 'ubuntu-latest'
-    environment: 'development'
+    environment: 'production'
     strategy:
       runOnce:
         deploy:
@@ -98,11 +103,23 @@ stages:
               azureSubscription: 'hsq-forms-azure-connection'
               scriptType: 'bash'
               scriptLocation: 'inlineScript'
+              addSpnToEnvironment: true
+              useGlobalConfig: true
               inlineScript: |
-                IMAGE="$(devRegistry)/$(devImageName):latest"
-                echo "Deploying $IMAGE to $(devContainerApp)"
+                # Använd Managed Identity för autentisering
+                echo "Logging in with Managed Identity..."
+                az login --identity
+                
+                # Sätt rätt subscription
+                az account set --subscription $(azureSubscription)
+                
+                IMAGE="$(prodRegistry)/$(prodImageName):latest"
+                echo "Deploying $IMAGE to $(prodContainerApp)"
+                
+                # Logga in till ACR med Managed Identity
+                az acr login --name hsqformsprodacr
                 
                 az containerapp update \
-                  --name $(devContainerApp) \
-                  --resource-group $(devResourceGroup) \
+                  --name $(prodContainerApp) \
+                  --resource-group $(prodResourceGroup) \
                   --image $IMAGE
