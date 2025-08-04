@@ -40,21 +40,15 @@ stages:
     pool:
       vmImage: 'ubuntu-latest'
     
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_PASSWORD: testpass
-          POSTGRES_USER: testuser
-          POSTGRES_DB: testdb
-        ports:
-          5432:5432
+    # Use container for PostgreSQL
+    container: python:3.11
     
     steps:
-    - task: UsePythonVersion@0
-      inputs:
-        versionSpec: '3.11'
-        displayName: 'Use Python 3.11'
+    - script: |
+        # Start PostgreSQL in background
+        docker run --name postgres-test -e POSTGRES_PASSWORD=testpass -e POSTGRES_USER=testuser -e POSTGRES_DB=testdb -p 5432:5432 -d postgres:15
+        sleep 10
+      displayName: 'Start PostgreSQL'
     
     - script: |
         python -m pip install --upgrade pip
