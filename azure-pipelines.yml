@@ -1,0 +1,191 @@
+# Azure DevOps Pipeline för HSQ Forms API
+# Baserat på nuvarande GitHub Actions workflow
+
+trigger:
+  branches:
+    include:
+    - main
+    - develop
+  tags:
+    include:
+    - v*
+
+pr:
+  branches:
+    include:
+    - main
+
+variables:
+  # Azure Settings
+  azureSubscription: 'c0b03b12-570f-4442-b337-c9175ad4037f'
+  
+  # Development Environment
+  devRegistry: 'hsqformsdevacr.azurecr.io'
+  devImageName: 'hsq-forms-api-dev'
+  devResourceGroup: 'rg-hsq-forms-dev'
+  devContainerApp: 'hsq-forms-api-dev'
+  
+  # Production Environment  
+  prodRegistry: 'hsqformsprodacr.azurecr.io'
+  prodImageName: 'hsq-forms-api'
+  prodResourceGroup: 'rg-hsq-forms-prod'
+  prodContainerApp: 'hsq-forms-api-v2'
+
+stages:
+- stage: Test
+  displayName: 'Run Tests'
+  jobs:
+  - job: TestJob
+    displayName: 'Test Python Application'
+    pool:
+      vmImage: 'ubuntu-latest'
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_USER: testuser
+          POSTGRES_DB: testdb
+        ports:
+          5432:5432
+    
+    steps:
+    - task: UsePythonVersion@0
+      inputs:
+        versionSpec: '3.11'
+        displayName: 'Use Python 3.11'
+    
+    - script: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-dev.txt
+        pip install pytest-asyncio
+      displayName: 'Install dependencies'
+    
+    - script: |
+        python -m pytest tests/test_webhooks.py -v
+      displayName: 'Run tests'
+      env:
+        DATABASE_URL: postgresql://testuser:testpass@localhost:5432/testdb
+        SECRET_KEY: test-secret-key
+        TESTING: "true"
+        SKIP_API_TESTS: "true"
+
+- stage: BuildDev
+  displayName: 'Build & Push Development'
+  dependsOn: Test
+  condition: and(succeeded(), or(eq(variables['Build.SourceBranch'], 'refs/heads/develop'), eq(variables['Build.Reason'], 'Manual')))
+  jobs:
+  - job: BuildDevJob
+    displayName: 'Build and Push Dev Image'
+    pool:
+      vmImage: 'ubuntu-latest'
+    
+    steps:
+    - task: Docker@2
+      displayName: 'Login to ACR'
+      inputs:
+        command: 'login'
+        containerRegistry: 'hsq-forms-dev-acr'  # Service Connection name
+    
+    - task: Docker@2
+      displayName: 'Build and Push Dev Image'
+      inputs:
+        command: 'buildAndPush'
+        repository: '$(devImageName)'
+        dockerfile: './Dockerfile'
+        containerRegistry: 'hsq-forms-dev-acr'
+        tags: |
+          $(Build.BuildNumber)
+          latest
+        arguments: '--build-arg ENVIRONMENT=development'
+
+- stage: DeployDev
+  displayName: 'Deploy to Development'
+  dependsOn: BuildDev
+  condition: succeeded()
+  jobs:
+  - deployment: DeployDevJob
+    displayName: 'Deploy to Dev Container App'
+    pool:
+      vmImage: 'ubuntu-latest'
+    environment: 'development'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: AzureCLI@2
+            displayName: 'Deploy to Container App'
+            inputs:
+              azureSubscription: 'hsq-forms-azure-connection'  # Service Connection
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                IMAGE="$(devRegistry)/$(devImageName):latest"
+                echo "Deploying $IMAGE to $(devContainerApp)"
+                
+                az containerapp update \
+                  --name $(devContainerApp) \
+                  --resource-group $(devResourceGroup) \
+                  --image $IMAGE
+
+- stage: BuildProd
+  displayName: 'Build & Push Production'
+  dependsOn: Test
+  condition: and(succeeded(), or(startsWith(variables['Build.SourceBranch'], 'refs/tags/v'), eq(variables['Build.SourceBranch'], 'refs/heads/main')))
+  jobs:
+  - job: BuildProdJob
+    displayName: 'Build and Push Prod Image'
+    pool:
+      vmImage: 'ubuntu-latest'
+    
+    steps:
+    - task: Docker@2
+      displayName: 'Login to Prod ACR'
+      inputs:
+        command: 'login'
+        containerRegistry: 'hsq-forms-prod-acr'  # Service Connection name
+    
+    - task: Docker@2
+      displayName: 'Build and Push Prod Image'
+      inputs:
+        command: 'buildAndPush'
+        repository: '$(prodImageName)'
+        dockerfile: './Dockerfile.prod'
+        containerRegistry: 'hsq-forms-prod-acr'
+        tags: |
+          $(Build.BuildNumber)
+          latest
+        arguments: '--build-arg ENVIRONMENT=production'
+
+- stage: DeployProd
+  displayName: 'Deploy to Production'
+  dependsOn: BuildProd
+  condition: and(succeeded(), startsWith(variables['Build.SourceBranch'], 'refs/tags/v'))
+  jobs:
+  - deployment: DeployProdJob
+    displayName: 'Deploy to Prod Container App'
+    pool:
+      vmImage: 'ubuntu-latest'
+    environment: 'production'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: AzureCLI@2
+            displayName: 'Deploy to Container App'
+            inputs:
+              azureSubscription: 'hsq-forms-azure-connection'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                # Extract version from tag (v1.0.0 -> 1.0.0)
+                TAG=$(echo "$(Build.SourceBranchName)" | sed 's/^v//')
+                IMAGE="$(prodRegistry)/$(prodImageName):$TAG"
+                echo "Deploying $IMAGE to $(prodContainerApp)"
+                
+                az containerapp update \
+                  --name $(prodContainerApp) \
+                  --resource-group $(prodResourceGroup) \
+                  --image $IMAGE
