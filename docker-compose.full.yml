@@ -1,0 +1,106 @@
+name: hsq-forms-api
+
+services:
+  # Core services
+  postgres:
+    image: postgres:15
+    container_name: postgres-1
+    environment:
+      POSTGRES_DB: hsq_forms
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: local_dev_password_123
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hsq-forms
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        ENVIRONMENT: development
+    container_name: hsq-forms-api
+    ports:
+      - "8000:8000"
+    environment:
+      POSTGRES_DB: hsq_forms
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: local_dev_password_123
+      POSTGRES_HOST: postgres
+      DEBUG: "true"
+      APP_ENVIRONMENT: development
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["uvicorn", "src.forms_api.app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    networks:
+      - hsq-forms
+
+  # Form containers
+  b2b-feedback:
+    build:
+      context: ./forms/hsq-forms-container-b2b-feedback
+      dockerfile: Dockerfile
+    container_name: b2b-feedback-1
+    ports:
+      - "3001:3000"
+    environment:
+      REACT_APP_API_URL: http://localhost:8000
+      REACT_APP_FORM_TYPE: b2b-feedback
+    networks:
+      - hsq-forms
+
+  b2b-support:
+    build:
+      context: ./forms/hsq-forms-container-b2b-support
+      dockerfile: Dockerfile
+    container_name: b2b-support-1
+    ports:
+      - "3003:3000"
+    environment:
+      REACT_APP_API_URL: http://localhost:8000
+      REACT_APP_FORM_TYPE: b2b-support
+    networks:
+      - hsq-forms
+
+  b2b-returns:
+    build:
+      context: ./forms/hsq-forms-container-b2b-returns
+      dockerfile: Dockerfile
+    container_name: b2b-returns-1
+    ports:
+      - "3002:3000"
+    environment:
+      REACT_APP_API_URL: http://localhost:8000
+      REACT_APP_FORM_TYPE: b2b-returns
+    networks:
+      - hsq-forms
+
+  b2c-returns:
+    build:
+      context: ./forms/hsq-forms-container-b2c-returns
+      dockerfile: Dockerfile
+    container_name: b2c-returns-1
+    ports:
+      - "3004:3000"
+    environment:
+      REACT_APP_API_URL: http://localhost:8000
+      REACT_APP_FORM_TYPE: b2c-returns
+    networks:
+      - hsq-forms
+
+volumes:
+  postgres_data:
+
+networks:
+  hsq-forms:
+    name: hsq-forms
+    driver: bridge

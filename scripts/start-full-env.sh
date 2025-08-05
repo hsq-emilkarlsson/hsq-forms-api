@@ -15,9 +15,9 @@ if ! docker info > /dev/null 2>&1; then
 fi
 
 # Skapa nätverk om det inte finns
-if ! docker network ls | grep -q hsq-forms-network; then
-    echo "📶 Creating hsq-forms-network..."
-    docker network create hsq-forms-network
+if ! docker network ls | grep -q hsq-forms; then
+    echo "📶 Creating hsq-forms network..."
+    docker network create hsq-forms
 fi
 
 # Starta alla services

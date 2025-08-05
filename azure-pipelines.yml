@@ -68,15 +68,26 @@ stages:
     - checkout: self
     
     - task: AzureCLI@2
+      displayName: 'Check Available Service Connections'
+      inputs:
+        azureSubscription: 'Azure subscription 1'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          echo "🔍 Checking current Azure context..."
+          az account show --output table
+          echo ""
+          echo "🎯 Target subscription: $(subscriptionId)"
+          echo "🏗️ Target resource group: $(resourceGroupName)"
+          echo "🌍 Location: West Europe"
+        
+    - task: AzureCLI@2
       displayName: 'Deploy Bicep Template'
       inputs:
         azureSubscription: 'Azure subscription 1'
         scriptType: 'bash'
         scriptLocation: 'inlineScript'
         inlineScript: |
-          echo "🔍 Current subscription:"
-          az account show --output table
-          
           echo "🏗️ Creating resource group: $(resourceGroupName)"
           az group create --name $(resourceGroupName) --location "West Europe"
           
