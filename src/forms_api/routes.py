@@ -4,6 +4,8 @@ API routes for the HSQ Forms API
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from typing import List
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from src.forms_api.db import get_db
 from src.forms_api.models import FormTemplate, FormSubmission
@@ -26,14 +28,17 @@ import logging
 import os
 
 router = APIRouter()
+limiter = Limiter(key_func=get_remote_address)
 
 
 @router.post("/templates", response_model=FormTemplateResponse)
+@limiter.limit("5/minute")  # Admin endpoint - low rate limit
 def create_template(
+    request: Request,
     template_data: FormTemplateCreate,
     db: Session = Depends(get_db)
 ):
-    """Create a new form template"""
+    """Create a new form template - Admin endpoint with rate limiting"""
     try:
         template = FormBuilderService.create_form_template(db, template_data)
         return FormTemplateResponse.model_validate(template)
@@ -42,7 +47,9 @@ def create_template(
 
 
 @router.get("/templates", response_model=List[FormTemplateResponse])
+@limiter.limit("30/minute")  # Read endpoint - higher rate limit
 def list_templates(
+    request: Request,
     project_id: str = None,
     db: Session = Depends(get_db)
 ):
@@ -52,7 +59,9 @@ def list_templates(
 
 
 @router.get("/templates/{template_id}", response_model=FormTemplateResponse)
+@limiter.limit("60/minute")  # Template read - high rate limit
 def get_template(
+    request: Request,
     template_id: str,
     db: Session = Depends(get_db)
 ):
@@ -64,13 +73,14 @@ def get_template(
 
 
 @router.post("/templates/{template_id}/submit", response_model=FormSubmissionResponse)
+@limiter.limit("10/minute")  # Form submission - moderate rate limit
 def submit_form(
+    request: Request,
     template_id: str,
     submission_data: FormSubmissionCreate,
-    request: Request,
     db: Session = Depends(get_db)
 ):
-    """Submit form data"""
+    """Submit form data - Rate limited to prevent spam"""
     try:
         ip_address = request.client.host if request.client else None
         # Create form submission directly
@@ -91,19 +101,25 @@ def submit_form(
 
 
 @router.get("/templates/{template_id}/submissions", response_model=List[FormSubmissionResponse])
+@limiter.limit("20/minute")  # Admin endpoint - moderate rate limit
 def get_submissions(
+    request: Request,
     template_id: str,
     db: Session = Depends(get_db)
 ):
-    """Get all submissions for a template"""
+    """Get all submissions for a template - Admin endpoint"""
     submissions = db.query(FormSubmission).filter(FormSubmission.template_id == template_id).all()
     return [FormSubmissionResponse.model_validate(s) for s in submissions]
 
 
 # ESB Integration endpoints
 @router.post("/esb/validate-customer", response_model=CustomerValidationResponse)
-async def validate_customer(request: CustomerValidationRequest):
-    """Validate customer number through Husqvarna ESB API"""
+@limiter.limit("30/minute")  # Customer validation - higher rate limit
+async def validate_customer(
+    request: Request,
+    validation_request: CustomerValidationRequest
+):
+    """Validate customer number through Husqvarna ESB API - Rate limited"""
     try:
         settings = get_settings()
         

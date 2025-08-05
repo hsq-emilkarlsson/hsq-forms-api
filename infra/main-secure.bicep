@@ -1,6 +1,5 @@
-// 🏗️ HSQ Forms API - Clean Azure Infrastructure
-// Skapar alla nödvändiga Azure-resurser för HSQ Forms API
-// Stöder både DEV och PROD miljöer
+// 🔒 HSQ Forms API - Secure Azure Infrastructure 
+// Säkrare arkitektur med separation av frontend och API
 
 @description('Environment name (dev/prod)')
 param environmentName string = 'dev'
@@ -19,6 +18,9 @@ param dbAdminUsername string
 @secure()
 param dbAdminPassword string
 
+@description('Allowed frontend origins for CORS')
+param frontendOrigins array = []
+
 @description('Container app scaling configuration')
 param containerAppScale object = {
   minReplicas: 1
@@ -34,7 +36,17 @@ var tags = {
   'azd-env-name': environmentName
 }
 
-// 💾 Storage Account for file uploads
+// CORS origins baserat på miljö
+var corsOrigins = environmentName == 'dev' ? [
+  'http://localhost:3000'
+  'http://localhost:5173'
+  'http://localhost:8080'
+] : length(frontendOrigins) > 0 ? frontendOrigins : [
+  'https://husqvarnagroup.com'
+  'https://*.husqvarnagroup.com'
+]
+
+// 💾 Secure Storage Account
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
   name: '${projectName}${environmentName}${resourceToken}'
   location: location
@@ -47,6 +59,11 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
     supportsHttpsTrafficOnly: true
     minimumTlsVersion: 'TLS1_2'
     allowBlobPublicAccess: false
+    publicNetworkAccess: 'Disabled' // 🔒 Disable public access
+    networkAcls: {
+      defaultAction: 'Deny'
+      bypass: 'AzureServices'
+    }
     encryption: {
       services: {
         blob: {
@@ -63,17 +80,17 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
       cors: {
         corsRules: [
           {
-            allowedOrigins: ['*']
-            allowedMethods: ['GET', 'POST', 'PUT', 'DELETE', 'HEAD', 'OPTIONS']
-            allowedHeaders: ['*']
+            allowedOrigins: corsOrigins
+            allowedMethods: ['GET', 'POST', 'PUT', 'HEAD']
+            allowedHeaders: ['Content-Type', 'Authorization']
             exposedHeaders: ['*']
-            maxAgeInSeconds: 86400
+            maxAgeInSeconds: 3600
           }
         ]
       }
       deleteRetentionPolicy: {
         enabled: true
-        days: 7
+        days: 30
       }
     }
 
@@ -83,17 +100,10 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
         publicAccess: 'None'
       }
     }
-
-    resource tempContainer 'containers@2023-01-01' = {
-      name: 'temp-uploads'
-      properties: {
-        publicAccess: 'None'
-      }
-    }
   }
 }
 
-// 🗄️ PostgreSQL Flexible Server
+// 🗄️ Secure PostgreSQL Server
 resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2023-03-01-preview' = {
   name: '${projectName}-${environmentName}-${resourceToken}'
   location: location
@@ -121,24 +131,12 @@ resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2023-03-01-pr
 
   resource database 'databases@2023-03-01-preview' = {
     name: 'hsq_forms'
-    properties: {
-      charset: 'UTF8'
-      collation: 'en_US.utf8'
-    }
-  }
-
-  resource firewallRuleAzure 'firewallRules@2023-03-01-preview' = {
-    name: 'AllowAllAzureServices'
-    properties: {
-      startIpAddress: '0.0.0.0'
-      endIpAddress: '0.0.0.0'
-    }
   }
 }
 
-// 📊 Log Analytics Workspace
+// 🌐 Container Apps Environment with security
 resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
-  name: '${projectName}-logs-${environmentName}-${resourceToken}'
+  name: '${projectName}-${environmentName}-${resourceToken}'
   location: location
   tags: tags
   properties: {
@@ -146,16 +144,11 @@ resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09
       name: 'PerGB2018'
     }
     retentionInDays: 30
-    features: {
-      legacy: 0
-      searchVersion: 1
-    }
   }
 }
 
-// 🏗️ Container Apps Environment
 resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2023-05-01' = {
-  name: '${projectName}-env-${environmentName}-${resourceToken}'
+  name: '${projectName}-${environmentName}-${resourceToken}'
   location: location
   tags: tags
   properties: {
@@ -166,23 +159,35 @@ resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2023-05-01'
         sharedKey: logAnalyticsWorkspace.listKeys().primarySharedKey
       }
     }
+    vnetConfiguration: {
+      internal: true // 🔒 Internal VNet för säkerhet
+    }
   }
 }
 
-// 🔐 Managed Identity
+// 🔐 Managed Identity för säker autentisering
 resource managedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
-  name: '${projectName}-identity-${environmentName}-${resourceToken}'
+  name: '${projectName}-${environmentName}-identity'
   location: location
   tags: tags
 }
 
-// 🚀 Container App
-resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
-  name: '${projectName}-api-${environmentName}-${resourceToken}'
+// 📋 Storage access för Managed Identity
+resource storageRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: storageAccount
+  name: guid(storageAccount.id, managedIdentity.id, 'StorageBlobDataContributor')
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe') // Storage Blob Data Contributor
+    principalId: managedIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// 🏗️ FRONTEND Container App (Publicly accessible)
+resource frontendApp 'Microsoft.App/containerApps@2023-05-01' = {
+  name: '${projectName}-frontend-${environmentName}'
   location: location
-  tags: union(tags, {
-    'azd-service-name': 'api'
-  })
+  tags: tags
   identity: {
     type: 'UserAssigned'
     userAssignedIdentities: {
@@ -194,47 +199,80 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
     configuration: {
       activeRevisionsMode: 'Single'
       ingress: {
-        external: environmentName == 'dev' ? true : false  // DEV external för testing, PROD internal
-        targetPort: 8000
+        external: true // ✅ Frontend kan vara extern
+        targetPort: 3000
         transport: 'http'
-        corsPolicy: environmentName == 'dev' ? {
-          allowedOrigins: [
-            'http://localhost:3000'
-            'http://localhost:5173'
-            'http://localhost:8080'
-            'http://127.0.0.1:3000'
-            'http://127.0.0.1:5173'
-            'http://127.0.0.1:8080'
-          ]
-          allowedMethods: ['GET', 'POST', 'OPTIONS']
-          allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key']
-          allowCredentials: false
-        } : {
-          allowedOrigins: [
-            'https://husqvarnagroup.com'
-            'https://*.husqvarnagroup.com'
-          ]
-          allowedMethods: ['GET', 'POST', 'OPTIONS']
-          allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key']
+        corsPolicy: {
+          allowedOrigins: corsOrigins
+          allowedMethods: ['GET', 'OPTIONS']
+          allowedHeaders: ['Content-Type']
           allowCredentials: false
         }
+      }
+    }
+    template: {
+      containers: [
+        {
+          name: 'frontend'
+          image: 'hsqformsdevacr.azurecr.io/hsq-forms-frontend:latest'
+          resources: {
+            cpu: 1
+            memory: '0.5Gi'
+          }
+          env: [
+            {
+              name: 'API_BASE_URL'
+              value: 'https://${apiApp.properties.configuration.ingress.fqdn}'
+            }
+            {
+              name: 'NODE_ENV'
+              value: environmentName == 'prod' ? 'production' : 'development'
+            }
+          ]
+        }
+      ]
+      scale: containerAppScale
+    }
+  }
+}
+
+// 🔒 API Container App (Internal only)
+resource apiApp 'Microsoft.App/containerApps@2023-05-01' = {
+  name: '${projectName}-api-${environmentName}'
+  location: location
+  tags: tags
+  identity: {
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${managedIdentity.id}': {}
+    }
+  }
+  properties: {
+    managedEnvironmentId: containerAppsEnvironment.id
+    configuration: {
+      activeRevisionsMode: 'Single'
+      ingress: {
+        external: false // 🔒 KRITISKT: API endast intern access
+        targetPort: 8000
+        transport: 'http'
+        // CORS hanteras i applikationen med miljöspecifika inställningar
       }
       secrets: [
         {
           name: 'database-url'
           value: 'postgresql://${dbAdminUsername}:${dbAdminPassword}@${postgresServer.properties.fullyQualifiedDomainName}:5432/hsq_forms'
         }
-        {
-          name: 'storage-account-key'
-          value: storageAccount.listKeys().keys[0].value
-        }
       ]
     }
     template: {
       containers: [
         {
-          name: 'hsq-forms-api'
-          image: 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+          name: 'api'
+          image: 'hsqformsdevacr.azurecr.io/hsq-forms-api:latest'
+          resources: {
+            cpu: 1
+            memory: '1Gi'
+          }
           env: [
             {
               name: 'APP_ENVIRONMENT'
@@ -249,22 +287,14 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
               value: storageAccount.name
             }
             {
-              name: 'AZURE_STORAGE_CONTAINER_NAME'
-              value: 'form-uploads'
-            }
-            {
-              name: 'AZURE_STORAGE_TEMP_CONTAINER_NAME'
-              value: 'temp-uploads'
-            }
-            {
               name: 'AZURE_CLIENT_ID'
               value: managedIdentity.properties.clientId
             }
+            {
+              name: 'LOG_LEVEL'
+              value: environmentName == 'prod' ? 'info' : 'debug'
+            }
           ]
-          resources: {
-            cpu: json('0.5')
-            memory: '1Gi'
-          }
         }
       ]
       scale: containerAppScale
@@ -272,20 +302,19 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
   }
 }
 
-// 📤 Outputs
-output RESOURCE_GROUP_ID string = resourceGroup().id
-output AZURE_CONTAINER_APPS_ENVIRONMENT_ID string = containerAppsEnvironment.id
-output SERVICE_API_IDENTITY_PRINCIPAL_ID string = managedIdentity.properties.principalId
-output SERVICE_API_NAME string = containerApp.name
-output SERVICE_API_URI string = 'https://${containerApp.properties.configuration.ingress.fqdn}'
-output AZURE_STORAGE_ACCOUNT_NAME string = storageAccount.name
-output AZURE_STORAGE_BLOB_ENDPOINT string = storageAccount.properties.primaryEndpoints.blob
-
-// Backward compatibility
+// 🔍 Outputs
+output apiUrl string = 'https://${apiApp.properties.configuration.ingress.fqdn}'
+output frontendUrl string = 'https://${frontendApp.properties.configuration.ingress.fqdn}'
 output storageAccountName string = storageAccount.name
 output databaseHost string = postgresServer.properties.fullyQualifiedDomainName
-output databaseName string = postgresServer::database.name
-output containerAppUrl string = 'https://${containerApp.properties.configuration.ingress.fqdn}'
-output managedIdentityPrincipalId string = managedIdentity.properties.principalId
-output managedIdentityClientId string = managedIdentity.properties.clientId
-output logAnalyticsWorkspaceId string = logAnalyticsWorkspace.id
+output managedIdentityId string = managedIdentity.id
+
+// 📊 Security Summary
+output securityFeatures object = {
+  apiAccess: 'Internal Only'
+  databaseAccess: 'Private'
+  storageAccess: 'Private with Managed Identity'
+  corsOrigins: corsOrigins
+  httpsOnly: true
+  tlsVersion: 'TLS 1.2+'
+}

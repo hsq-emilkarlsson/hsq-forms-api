@@ -1,0 +1,45 @@
+# 🚀 HSQ Forms API - Simple Deployment Pipeline
+# Simplified version to get infrastructure deployed quickly
+
+trigger:
+  branches:
+    include:
+      - develop
+
+variables:
+  # Basic settings
+  resourceGroupName: 'rg-hsq-forms-dev'
+  location: 'West Europe'
+  environment: 'dev'
+
+stages:
+- stage: DeployInfrastructure
+  displayName: 'Deploy Infrastructure Only'
+  jobs:
+  - job: DeployInfra
+    displayName: 'Deploy Bicep Infrastructure'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - checkout: self
+    
+    - task: AzureResourceManagerTemplateDeployment@3
+      displayName: 'Deploy Infrastructure'
+      inputs:
+        deploymentScope: 'Resource Group'
+        azureResourceManagerConnection: 'Azure subscription 1(c0b03b12-570f-4442-b337-c9175ad4037f)'
+        subscriptionId: 'c0b03b12-570f-4442-b337-c9175ad4037f'
+        action: 'Create Or Update Resource Group'
+        resourceGroupName: '$(resourceGroupName)'
+        location: '$(location)'
+        templateLocation: 'Linked artifact'
+        csmFile: 'infra/main.bicep'
+        csmParametersFile: 'infra/main.parameters.dev.json'
+        overrideParameters: '-dbAdminPassword "$(DB_ADMIN_PASSWORD)"'
+        deploymentMode: 'Incremental'
+        
+    - script: |
+        echo "Infrastructure deployed successfully!"
+        echo "Resource Group: $(resourceGroupName)"
+        echo "Check Azure Portal for created resources"
+      displayName: 'Deployment Complete'

@@ -16,3 +16,7 @@ aiohttp==3.12.7  # Required for async Azure Storage operations
 
 jsonschema==4.21.1
 httpx==0.25.2  # Required for async HTTP requests (webhooks)
+
+# Security & Rate Limiting
+slowapi==0.1.9  # Rate limiting middleware
+redis==5.0.1  # Redis backend for rate limiting (optional)

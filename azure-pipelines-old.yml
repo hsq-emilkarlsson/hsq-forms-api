@@ -1,5 +1,5 @@
-# 🚀 HSQ Forms API - Azure DevOps Pipeline
-# Uppdaterad för att matcha infrastruktur och säkerhetskonfiguration
+# 🚀 HSQ Forms API - Complete Azure DevOps Pipeline
+# Infrastructure deployment + Application deployment
 
 trigger:
   branches:
@@ -70,7 +70,7 @@ stages:
     - task: AzureCLI@2
       displayName: 'Deploy Bicep Template'
       inputs:
-        azureSubscription: 'Azure subscription 1($(subscriptionId))'
+        azureSubscription: 'Azure subscription 1(c0b03b12-570f-4442-b337-c9175ad4037f)'  # Use default subscription connection
         scriptType: 'bash'
         scriptLocation: 'inlineScript'
         inlineScript: |
@@ -100,24 +100,35 @@ stages:
           steps:
           - checkout: self
           
-          - script: |
-              echo "🚀 Starting DEV deployment..."
-              echo "ACR: $(acrName).azurecr.io"
-              echo "Image: $(imageRepository):$(tag)"
-              echo "Resource Group: $(resourceGroupName)"
-            displayName: 'Deployment Info'
+          - task: Docker@2
+            displayName: 'Build and push image to ACR'
+            inputs:
+              command: 'buildAndPush'
+              repository: '$(imageRepository)'
+              dockerfile: '$(dockerfilePath)'
+              containerRegistry: 'hsqformsdevacr'
+              tags: |
+                $(tag)
+                latest
           
-          - script: |
-              echo "✅ DEV infrastructure should be deployed!"
-              echo "📋 Next: Configure ACR service connection for Docker push"
-              echo "🔗 ACR Name: $(acrName)"
-              echo "📍 Resource Group: $(resourceGroupName)"
-              echo ""
-              echo "🎯 Manual steps needed:"
-              echo "1. Create ACR service connection: $(acrName)"
-              echo "2. Add Docker build/push tasks"
-              echo "3. Configure Container App deployment"
-            displayName: 'DEV Deployment Status'
+          - task: AzureCLI@2
+            displayName: 'Update Container App'
+            inputs:
+              azureSubscription: 'AzureServiceConnection-dev'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                # Get Container App name
+                CONTAINER_APP_NAME=$(az containerapp list \
+                  --resource-group $(resourceGroupName) \
+                  --query "[?contains(name, 'hsq-forms-api')].name" \
+                  --output tsv)
+                
+                # Update container app with new image
+                az containerapp update \
+                  --name $CONTAINER_APP_NAME \
+                  --resource-group $(resourceGroupName) \
+                  --image $(acrName).azurecr.io/$(imageRepository):$(tag)
 
 - stage: BuildAndDeployProd
   displayName: 'Build & Deploy to PROD'
@@ -135,9 +146,32 @@ stages:
           steps:
           - checkout: self
           
-          - script: |
-              echo "🚀 Starting PROD deployment..."
-              echo "ACR: $(acrName).azurecr.io"
-              echo "Image: $(imageRepository):$(tag)"
-              echo "Resource Group: $(resourceGroupName)"
-            displayName: 'Deployment Info'
+          - task: Docker@2
+            displayName: 'Build and push image to ACR'
+            inputs:
+              command: 'buildAndPush'
+              repository: '$(imageRepository)'
+              dockerfile: '$(dockerfilePath)'
+              containerRegistry: 'hsqformsprodacr'
+              tags: |
+                $(tag)
+                latest
+          
+          - task: AzureCLI@2
+            displayName: 'Update Container App'
+            inputs:
+              azureSubscription: 'AzureServiceConnection-prod'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                # Get Container App name
+                CONTAINER_APP_NAME=$(az containerapp list \
+                  --resource-group $(resourceGroupName) \
+                  --query "[?contains(name, 'hsq-forms-api')].name" \
+                  --output tsv)
+                
+                # Update container app with new image
+                az containerapp update \
+                  --name $CONTAINER_APP_NAME \
+                  --resource-group $(resourceGroupName) \
+                  --image $(acrName).azurecr.io/$(imageRepository):$(tag)

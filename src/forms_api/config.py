@@ -11,7 +11,7 @@ import logging
 from functools import lru_cache
 from typing import Dict, List, Optional, Union
 
-from pydantic import AnyHttpUrl, ConfigDict, validator
+from pydantic import AnyHttpUrl, ConfigDict, field_validator
 from pydantic_settings import BaseSettings
 
 logger = logging.getLogger(__name__)
@@ -46,13 +46,43 @@ class Settings(BaseSettings):
     api_docs_url: str = "/docs" if environment != "production" else None
     api_redoc_url: str = "/redoc" if environment != "production" else None
     
-    # CORS settings
-    cors_origins: Union[List[str], str] = "*" if environment == "development" else []
+    # CORS settings - Environment specific security
+    cors_origins: Union[List[str], str] = []
+    
+    @field_validator('cors_origins')
+    @classmethod
+    def validate_cors_origins(cls, v, info):
+        """Set CORS origins based on environment."""
+        environment = info.data.get('environment', 'development') if info.data else 'development'
+        
+        if environment == "development":
+            return [
+                "http://localhost:3000",
+                "http://localhost:5173", 
+                "http://localhost:8080",
+                "http://127.0.0.1:3000",
+                "http://127.0.0.1:5173",
+                "http://127.0.0.1:8080"
+            ]
+        elif environment == "staging":
+            return [
+                "https://hsq-forms-staging.azurecontainerapps.io",
+                "https://*.azurecontainerapps.io"
+            ]
+        elif environment == "production":
+            frontend_urls = os.environ.get("FRONTEND_URL", "").split(",") if os.environ.get("FRONTEND_URL") else []
+            return [
+                "https://husqvarnagroup.com",
+                "https://*.husqvarnagroup.com"
+            ] + [url.strip() for url in frontend_urls if url.strip()]
+        else:
+            return []
     cors_allow_credentials: bool = True
     cors_allow_methods: str = "GET,POST,PUT,DELETE,OPTIONS"
     cors_allow_headers: str = "Accept,Authorization,Content-Type,X-API-Key"
     
-    @validator("cors_origins", pre=True)
+    @field_validator("cors_origins", mode='before')
+    @classmethod
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> Union[List[str], str]:
         """Parse CORS origins from string to list if needed."""
         if isinstance(v, str):
@@ -100,7 +130,8 @@ class Settings(BaseSettings):
     api_key_header_name: str = "X-API-Key"
     allowed_api_keys: Union[str, List[str]] = ""  # Comma-separated list of allowed API keys
     
-    @validator("allowed_api_keys", pre=True)
+    @field_validator("allowed_api_keys", mode='before')
+    @classmethod
     def parse_allowed_api_keys(cls, v: Union[str, List[str]]) -> Union[str, List[str]]:
         """Parse allowed API keys from string to list."""
         if isinstance(v, str):
@@ -126,7 +157,8 @@ class Settings(BaseSettings):
     webhook_form_specific_urls: str = "{}"  # JSON string mapping form IDs to webhook URLs
     webhook_secret: str = ""  # Secret key for webhook authentication
     
-    @validator("webhooks_enabled", pre=True)
+    @field_validator("webhooks_enabled", mode='before')
+    @classmethod
     def parse_webhooks_enabled(cls, v: Union[str, bool]) -> bool:
         """Parse webhooks enabled from environment variable."""
         if isinstance(v, bool):

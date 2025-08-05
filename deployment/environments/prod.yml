@@ -1,0 +1,44 @@
+# HSQ Forms API - Production Environment Configuration  
+# Subscription: HAZE-00B9-APP1066-PROD-Martech-SharedServices
+
+environment:
+  name: prod
+  displayName: Production
+  subscription: TBD # Subscription ID från HAZE-00B9-APP1066-PROD-Martech-SharedServices
+  subscriptionName: HAZE-00B9-APP1066-PROD-Martech-SharedServices
+  region: westeurope
+
+naming:
+  prefix: hsq-forms
+  environment: prod
+  region: westeu
+
+resources:
+  resourceGroup: rg-hsq-forms-prod-westeu
+  containerRegistry: hsqformsprodacr
+  containerAppEnvironment: hsq-forms-prod-env
+  containerApp: hsq-forms-api-prod
+  keyVault: kv-hsq-forms-prod-westeu
+  logAnalytics: log-hsq-forms-prod-westeu
+  applicationInsights: ai-hsq-forms-prod-westeu
+  postgresqlServer: postgres-hsq-forms-prod-westeu
+
+database:
+  type: postgresql
+  sku: Standard
+  tier: GeneralPurpose
+  storageGB: 128
+  
+containerApp:
+  replicas:
+    min: 2
+    max: 10
+  resources:
+    cpu: "1.0"
+    memory: "2.0Gi"
+
+tags:
+  environment: prod
+  project: hsq-forms-api
+  owner: emil.karlsson@husqvarnagroup.com
+  costCenter: "1066"

@@ -1,0 +1,42 @@
+# HSQ Forms API - Development Environment Configuration
+# Subscription: HAZE-01AA-APP1066-Dev-Martechlab
+
+environment:
+  name: dev
+  displayName: Development
+  subscription: c0b03b12-570f-4442-b337-c9175ad4037f
+  subscriptionName: HAZE-01AA-APP1066-Dev-Martechlab
+  region: westeurope
+
+naming:
+  prefix: hsq-forms
+  environment: dev
+  region: westeu
+
+resources:
+  resourceGroup: rg-hsq-forms-dev-westeu
+  containerRegistry: hsqformsdevacr
+  containerAppEnvironment: hsq-forms-dev-env
+  containerApp: hsq-forms-api-dev
+  keyVault: kv-hsq-forms-dev-westeu
+  logAnalytics: log-hsq-forms-dev-westeu
+  applicationInsights: ai-hsq-forms-dev-westeu
+
+database:
+  # För dev kan vi använda Container App med PostgreSQL
+  type: postgresql
+  sku: Basic
+  
+containerApp:
+  replicas:
+    min: 1
+    max: 3
+  resources:
+    cpu: "0.5"
+    memory: "1.0Gi"
+  
+tags:
+  environment: dev
+  project: hsq-forms-api
+  owner: emil.karlsson@husqvarnagroup.com
+  costCenter: "1066"
