@@ -70,19 +70,23 @@ stages:
     - task: AzureCLI@2
       displayName: 'Deploy Bicep Template'
       inputs:
-        azureSubscription: 'Azure subscription 1($(subscriptionId))'
+        azureSubscription: 'Azure subscription 1'
         scriptType: 'bash'
         scriptLocation: 'inlineScript'
         inlineScript: |
-          # Create resource group if it doesn't exist
+          echo "🔍 Current subscription:"
+          az account show --output table
+          
+          echo "🏗️ Creating resource group: $(resourceGroupName)"
           az group create --name $(resourceGroupName) --location "West Europe"
           
-          # Deploy infrastructure
+          echo "📋 Deploying infrastructure..."
           az deployment group create \
             --resource-group $(resourceGroupName) \
             --template-file infra/main.bicep \
             --parameters @infra/main.parameters.$(environment).json \
-            --parameters dbAdminPassword="$(DB_ADMIN_PASSWORD)"
+            --parameters dbAdminPassword="$(DB_ADMIN_PASSWORD)" \
+            --verbose
 
 - stage: BuildAndDeployDev
   displayName: 'Build & Deploy to DEV'
