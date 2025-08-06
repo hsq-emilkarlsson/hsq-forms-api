@@ -106,8 +106,16 @@ stages:
             --parameters dbAdminUsername=hsqadmin \
             --parameters dbAdminPassword="$(DB_ADMIN_PASSWORD)" \
             --parameters containerAppScale='{"minReplicas":1,"maxReplicas":3}' \
-            --name "hsq-forms-$(environment)-$(Build.BuildNumber)" \
-            --output json
+            --name "hsq-forms-$(environment)-$(Build.BuildNumber)"
+          
+          if [ $? -eq 0 ]; then
+            echo "✅ Infrastructure deployment completed successfully!"
+            echo "📋 Checking deployed resources..."
+            az resource list --resource-group $(resourceGroupName) --output table
+          else
+            echo "❌ Infrastructure deployment failed!"
+            exit 1
+          fi
 
 - stage: BuildAndDeployDev
   displayName: 'Build & Deploy to DEV'
