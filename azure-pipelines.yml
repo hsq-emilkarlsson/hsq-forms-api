@@ -104,8 +104,9 @@ stages:
             --parameters environmentName=$(environment) \
             --parameters projectName=hsq-forms \
             --parameters dbAdminUsername=hsqadmin \
-            --parameters dbAdminPassword="$(DB_ADMIN_PASSWORD)" \
-            --parameters containerAppScale='{"minReplicas":1,"maxReplicas":3}' \
+            --parameters dbAdminPassword="$DB_PASSWORD" \
+            --parameters containerAppMinReplicas=1 \
+            --parameters containerAppMaxReplicas=3 \
             --name "hsq-forms-$(environment)-$(Build.BuildNumber)"
           
           if [ $? -eq 0 ]; then
@@ -116,6 +117,8 @@ stages:
             echo "❌ Infrastructure deployment failed!"
             exit 1
           fi
+      env:
+        DB_PASSWORD: $(DB_ADMIN_PASSWORD)
 
 - stage: BuildAndDeployDev
   displayName: 'Build & Deploy to DEV'

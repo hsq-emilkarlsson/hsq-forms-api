@@ -19,11 +19,11 @@ param dbAdminUsername string
 @secure()
 param dbAdminPassword string
 
-@description('Container app scaling configuration')
-param containerAppScale object = {
-  minReplicas: 1
-  maxReplicas: 3
-}
+@description('Container app minimum replicas')
+param containerAppMinReplicas int = 1
+
+@description('Container app maximum replicas')
+param containerAppMaxReplicas int = 3
 
 // Variables
 var resourceToken = toLower(uniqueString(subscription().id, resourceGroup().id, environmentName))
@@ -267,7 +267,10 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
           }
         }
       ]
-      scale: containerAppScale
+      scale: {
+        minReplicas: containerAppMinReplicas
+        maxReplicas: containerAppMaxReplicas
+      }
     }
   }
 }
