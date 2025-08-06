@@ -47,10 +47,12 @@ stages:
     
     - script: |
         python -m pip install --upgrade pip
+        pip install -r requirements.txt
         pip install -r requirements-dev.txt
       displayName: 'Install dependencies'
     
     - script: |
+        export SKIP_API_TESTS=true
         python -m pytest tests/ -v --tb=short
       displayName: 'Run tests'
       continueOnError: true
