@@ -34,6 +34,34 @@ var tags = {
   'azd-env-name': environmentName
 }
 
+// 🌐 Virtual Network för Container Apps Environment (krävs för Azure Policy compliance)
+resource vnet 'Microsoft.Network/virtualNetworks@2023-04-01' = {
+  name: '${projectName}-vnet-${environmentName}-${resourceToken}'
+  location: location
+  tags: tags
+  properties: {
+    addressSpace: {
+      addressPrefixes: ['10.0.0.0/16']
+    }
+    subnets: [
+      {
+        name: 'container-apps-subnet'
+        properties: {
+          addressPrefix: '10.0.1.0/24'
+          delegations: [
+            {
+              name: 'Microsoft.App.environments'
+              properties: {
+                serviceName: 'Microsoft.App/environments'
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}
+
 // 💾 Storage Account for file uploads
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
   name: '${projectName}${environmentName}${resourceToken}'
@@ -160,6 +188,10 @@ resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2023-05-01'
   location: location
   tags: tags
   properties: {
+    vnetConfiguration: {
+      infrastructureSubnetId: vnet.properties.subnets[0].id
+      internal: true
+    }
     appLogsConfiguration: {
       destination: 'log-analytics'
       logAnalyticsConfiguration: {
