@@ -91,15 +91,23 @@ stages:
         scriptLocation: 'inlineScript'
         inlineScript: |
           echo "🏗️ Creating resource group: $(resourceGroupName)"
-          az group create --name $(resourceGroupName) --location "West Europe"
+          az group create --name $(resourceGroupName) --location "West Europe" || echo "Resource group may already exist"
           
           echo "📋 Deploying infrastructure..."
+          echo "Using environment: $(environment)"
+          echo "Using DB admin password from pipeline variable"
+          
+          # Deploy with explicit parameters to avoid JSON parameter conflicts
           az deployment group create \
             --resource-group $(resourceGroupName) \
             --template-file infra/main.bicep \
-            --parameters @infra/main.parameters.$(environment).json \
+            --parameters environmentName=$(environment) \
+            --parameters projectName=hsq-forms \
+            --parameters dbAdminUsername=hsqadmin \
             --parameters dbAdminPassword="$(DB_ADMIN_PASSWORD)" \
-            --verbose
+            --parameters containerAppScale='{"minReplicas":1,"maxReplicas":3}' \
+            --name "hsq-forms-$(environment)-$(Build.BuildNumber)" \
+            --output json
 
 - stage: BuildAndDeployDev
   displayName: 'Build & Deploy to DEV'
