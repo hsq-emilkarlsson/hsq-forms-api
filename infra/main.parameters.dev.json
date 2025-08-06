@@ -12,13 +12,13 @@
       "value": "hsqadmin"
     },
     "dbAdminPassword": {
-      "value": "REPLACE_WITH_SECURE_PASSWORD_FROM_KEYVAULT"
+      "value": "REPLACE_WITH_SECURE_PASSWORD_FROM_PIPELINE"
     },
-    "containerAppScale": {
-      "value": {
-        "minReplicas": 1,
-        "maxReplicas": 3
-      }
+    "containerAppMinReplicas": {
+      "value": 1
+    },
+    "containerAppMaxReplicas": {
+      "value": 3
     }
   }
 }
