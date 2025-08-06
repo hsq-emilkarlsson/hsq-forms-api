@@ -35,6 +35,7 @@ def test_form_template_creation(api_url, test_project, sample_form_template):
     
     return template
 
+@skip_api_test
 def test_form_submission(api_url, test_project, sample_form_template, sample_form_submission):
     """Test the complete form submission flow"""
     # First create a template
@@ -53,6 +54,7 @@ def test_form_submission(api_url, test_project, sample_form_template, sample_for
     assert "submission_id" in result
     assert "submitted_at" in result
 
+@skip_api_test
 def test_legacy_form_submission(api_url):
     """Test the legacy form submission endpoint"""
     form_data = {
