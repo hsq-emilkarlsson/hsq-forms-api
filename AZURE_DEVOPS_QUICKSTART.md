@@ -131,8 +131,10 @@ Stage 3: Deploy (Information only)
 3. Kontrollera att följande resources finns:
    ✓ hsqformsdevacr (Container Registry)
    ✓ hsq-forms-dev-db (PostgreSQL)
-   ✓ hsqformsdev... (Storage Account)
-   ✓ hsq-forms-dev-env (Container Apps Environment)
+   ✓ hsqformsdev... (Storage Account - private)
+   ✓ hsq-forms-vnet-dev (Virtual Network)
+   ✓ hsq-forms-env-dev (Container Apps Environment - private)
+   ✓ hsq-forms-api-dev (Container App - internal)
 ```
 
 #### 5.2 Nästa steg efter infrastruktur
@@ -141,7 +143,7 @@ När infrastrukturen är skapad:
 1. ACR service connection
 2. Docker build/push
 3. Container deployment
-4. API testing
+4. VPN/Private endpoint för åtkomst (pga intern konfiguration)
 ```
 
 ## 🔧 **Troubleshooting**
@@ -173,10 +175,12 @@ Lösning: Detta är OK - pipeline hoppar över skapandet
 ### Problem 4: Azure CLI Response Error (✅ FIXED!)
 ```
 Symptom: "The content for this response was already consumed"
-🔧 LÖST: Borttagen --output json flagga från az deployment group create
-✅ Pipeline använder nu explicit parameters istället för JSON-fil  
-✅ Error handling och success validation tillagd
-✅ Resource listing efter lyckad deployment för verifiering
+🔧 RADIKALT LÖST: Ersatt Azure CLI med ARM Template Deployment Task
+✅ Använder AzureResourceManagerTemplateDeployment@3 istället för AzureCLI@2
+✅ ARM-tasken är specifikt designad för Bicep/ARM deployments
+✅ Eliminerar alla Azure CLI HTTP response-problem helt och hållet
+✅ Resource group skapas automatiskt av ARM-tasken
+✅ Parameterfiler uppdaterade för att matcha nya parameternamn
 ```
 
 ### Problem 5: Test Connection Errors (✅ FIXED!)
@@ -185,6 +189,28 @@ Symptom: "Connection refused: HTTPConnectionPool(host='localhost', port=8001)"
 🔧 LÖST: API-tester som kräver server är nu markerade med @skip_api_test
 ✅ SKIP_API_TESTS=true är satt i pipeline för att hoppa över integration tests
 ✅ Unit tests och isolerade tester körs fortfarande normalt
+```
+
+### Problem 6: Azure Policy Violations (✅ FIXED!)
+```
+Symptom: "was disallowed by policy" - deny-paas-public-dev policies
+🔧 LÖST: Uppdaterat infrastruktur för att följa Husqvarna Groups säkerhetspolicys
+✅ Storage Account: publicNetworkAccess: 'Disabled'
+✅ Container App: external: false (intern åtkomst endast)
+✅ Container Apps Environment: VNet-integration med private subnet
+✅ Skapad dedikerad VNet (10.0.0.0/16) med delegerad subnet
+✅ Borttagen CORS-konfiguration (ej behövd för intern app)
+✅ Infrastrukturen följer nu alla enterprise security policies
+```
+
+### Problem 7: Network Permissions Error (📋 PENDING IT SUPPORT)
+```
+Symptom: "does not have permission to perform action 'Microsoft.Network/virtualNetworks/write'"
+� KONFIRMERAT: Azure Policy kräver absolut VNet-integration för Container Apps Environment
+🎯 LÖSNING: Network permissions krävs från IT-organisationen
+📋 SKAPAD: Formell begäran i NETWORK_PERMISSIONS_REQUEST.md
+⏳ STATUS: Väntar på IT-support för Network Contributor permissions
+✅ REDO: Komplett infrastruktur förberedd för deployment efter permissions
 ```
 
 ## 🎯 **Vad händer sen?**

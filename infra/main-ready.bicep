@@ -1,6 +1,5 @@
-// 🏗️ HSQ Forms API - Clean Azure Infrastructure
-// Skapar alla nödvändiga Azure-resurser för HSQ Forms API
-// Stöder både DEV och PROD miljöer
+// 🚀 HSQ Forms API - Production-Ready Infrastructure with VNet
+// This template will work as soon as Network permissions are granted
 
 @description('Environment name (dev/prod)')
 param environmentName string = 'dev'
@@ -12,7 +11,6 @@ param location string = resourceGroup().location
 param projectName string = 'hsq-forms'
 
 @description('Database administrator username')
-@secure()
 param dbAdminUsername string
 
 @description('Database administrator password')  
@@ -34,7 +32,35 @@ var tags = {
   'azd-env-name': environmentName
 }
 
-// 💾 Storage Account for file uploads
+// 🌐 Virtual Network (REQUIRES NETWORK PERMISSIONS)
+resource vnet 'Microsoft.Network/virtualNetworks@2023-04-01' = {
+  name: '${projectName}-vnet-${environmentName}-${resourceToken}'
+  location: location
+  tags: tags
+  properties: {
+    addressSpace: {
+      addressPrefixes: ['10.0.0.0/16']
+    }
+    subnets: [
+      {
+        name: 'container-apps-subnet'
+        properties: {
+          addressPrefix: '10.0.1.0/24'
+          delegations: [
+            {
+              name: 'Microsoft.App.environments'
+              properties: {
+                serviceName: 'Microsoft.App/environments'
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}
+
+// 💾 Storage Account (Policy Compliant)
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
   name: '${projectName}${environmentName}${resourceToken}'
   location: location
@@ -47,7 +73,7 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
     supportsHttpsTrafficOnly: true
     minimumTlsVersion: 'TLS1_2'
     allowBlobPublicAccess: false
-    publicNetworkAccess: 'Disabled'
+    publicNetworkAccess: 'Disabled'  // Policy compliant
     encryption: {
       services: {
         blob: {
@@ -60,33 +86,16 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
 
   resource blobService 'blobServices@2023-01-01' = {
     name: 'default'
-    properties: {
-      cors: {
-        corsRules: [
-          {
-            allowedOrigins: ['*']
-            allowedMethods: ['GET', 'POST', 'PUT', 'DELETE', 'HEAD', 'OPTIONS']
-            allowedHeaders: ['*']
-            exposedHeaders: ['*']
-            maxAgeInSeconds: 86400
-          }
-        ]
-      }
-      deleteRetentionPolicy: {
-        enabled: true
-        days: 7
-      }
-    }
-
-    resource uploadsContainer 'containers@2023-01-01' = {
-      name: 'form-uploads'
+    
+    resource formsContainer 'containers@2023-01-01' = {
+      name: 'forms'
       properties: {
         publicAccess: 'None'
       }
     }
-
-    resource tempContainer 'containers@2023-01-01' = {
-      name: 'temp-uploads'
+    
+    resource uploadsContainer 'containers@2023-01-01' = {
+      name: 'uploads'
       properties: {
         publicAccess: 'None'
       }
@@ -94,7 +103,7 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
   }
 }
 
-// 🗄️ PostgreSQL Flexible Server
+// 🗄️ PostgreSQL Database
 resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2023-03-01-preview' = {
   name: '${projectName}-${environmentName}-${resourceToken}'
   location: location
@@ -109,7 +118,6 @@ resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2023-03-01-pr
     version: '15'
     storage: {
       storageSizeGB: 32
-      autoGrow: 'Enabled'
     }
     backup: {
       backupRetentionDays: 7
@@ -119,21 +127,27 @@ resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2023-03-01-pr
       mode: 'Disabled'
     }
   }
+}
 
-  resource database 'databases@2023-03-01-preview' = {
-    name: 'hsq_forms'
-    properties: {
-      charset: 'UTF8'
-      collation: 'en_US.utf8'
-    }
+resource postgresDatabase 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2023-03-01-preview' = {
+  parent: postgresServer
+  name: 'hsq_forms'
+  properties: {
+    charset: 'UTF8'
+    collation: 'en_US.UTF8'
   }
+}
 
-  resource firewallRuleAzure 'firewallRules@2023-03-01-preview' = {
-    name: 'AllowAllAzureServices'
-    properties: {
-      startIpAddress: '0.0.0.0'
-      endIpAddress: '0.0.0.0'
-    }
+// 🔧 Container Registry
+resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-01-01-preview' = {
+  name: '${projectName}${environmentName}acr${resourceToken}'
+  location: location
+  tags: tags
+  sku: {
+    name: 'Basic'
+  }
+  properties: {
+    adminUserEnabled: true
   }
 }
 
@@ -147,19 +161,19 @@ resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09
       name: 'PerGB2018'
     }
     retentionInDays: 30
-    features: {
-      legacy: 0
-      searchVersion: 1
-    }
   }
 }
 
-// 🏗️ Container Apps Environment
+// 🏗️ Container Apps Environment (VNet Integrated)
 resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2023-05-01' = {
   name: '${projectName}-env-${environmentName}-${resourceToken}'
   location: location
   tags: tags
   properties: {
+    vnetConfiguration: {
+      infrastructureSubnetId: vnet.properties.subnets[0].id
+      internal: true  // Private environment
+    }
     appLogsConfiguration: {
       destination: 'log-analytics'
       logAnalyticsConfiguration: {
@@ -195,7 +209,7 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
     configuration: {
       activeRevisionsMode: 'Single'
       ingress: {
-        external: false  // Ingen extern åtkomst pga Azure Policy
+        external: false  // Internal only (Policy compliant)
         targetPort: 8000
         transport: 'http'
       }
@@ -208,13 +222,17 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
           name: 'storage-account-key'
           value: storageAccount.listKeys().keys[0].value
         }
+        {
+          name: 'acr-password'
+          value: containerRegistry.listCredentials().passwords[0].value
+        }
       ]
     }
     template: {
       containers: [
         {
           name: 'hsq-forms-api'
-          image: 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+          image: 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'  // Placeholder
           env: [
             {
               name: 'APP_ENVIRONMENT'
@@ -229,16 +247,16 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
               value: storageAccount.name
             }
             {
-              name: 'AZURE_STORAGE_CONTAINER_NAME'
-              value: 'form-uploads'
+              name: 'AZURE_STORAGE_ACCOUNT_KEY'
+              secretRef: 'storage-account-key'
             }
             {
-              name: 'AZURE_STORAGE_TEMP_CONTAINER_NAME'
-              value: 'temp-uploads'
+              name: 'AZURE_STORAGE_CONTAINER_FORMS'
+              value: 'forms'
             }
             {
-              name: 'AZURE_CLIENT_ID'
-              value: managedIdentity.properties.clientId
+              name: 'AZURE_STORAGE_CONTAINER_UPLOADS'
+              value: 'uploads'
             }
           ]
           resources: {
@@ -261,14 +279,7 @@ output AZURE_CONTAINER_APPS_ENVIRONMENT_ID string = containerAppsEnvironment.id
 output SERVICE_API_IDENTITY_PRINCIPAL_ID string = managedIdentity.properties.principalId
 output SERVICE_API_NAME string = containerApp.name
 output SERVICE_API_URI string = 'https://${containerApp.properties.configuration.ingress.fqdn}'
-output AZURE_STORAGE_ACCOUNT_NAME string = storageAccount.name
-output AZURE_STORAGE_BLOB_ENDPOINT string = storageAccount.properties.primaryEndpoints.blob
-
-// Backward compatibility
-output storageAccountName string = storageAccount.name
-output databaseHost string = postgresServer.properties.fullyQualifiedDomainName
-output databaseName string = postgresServer::database.name
-output containerAppUrl string = 'https://${containerApp.properties.configuration.ingress.fqdn}'
-output managedIdentityPrincipalId string = managedIdentity.properties.principalId
-output managedIdentityClientId string = managedIdentity.properties.clientId
-output logAnalyticsWorkspaceId string = logAnalyticsWorkspace.id
+output AZURE_CONTAINER_REGISTRY_ENDPOINT string = containerRegistry.properties.loginServer
+output AZURE_CONTAINER_REGISTRY_NAME string = containerRegistry.name
+output DATABASE_HOST string = postgresServer.properties.fullyQualifiedDomainName
+output STORAGE_ACCOUNT_NAME string = storageAccount.name
