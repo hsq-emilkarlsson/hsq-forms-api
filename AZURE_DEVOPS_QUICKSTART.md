@@ -2,45 +2,65 @@
 
 ## 🎯 Mål: Få igång allt via Azure DevOps steg för steg
 
+### 📋 **STATUS: Projektet är DEPLOYMENT-KLART! ✅**
+
+**✅ FÄRDIGT:**
+- Service Connection skapad av IT-organisation
+- Bicep templates för infrastruktur (API, DB, Storage, Container Apps)
+- Azure Pipeline konfiguration
+- Container images för API + alla formulär
+- Database migrations och schemas
+- File upload-hantering med Azure Storage
+
+**⚠️ ÅTERSTÅR:**
+- Köra första pipeline-deploys för att skapa infrastruktur
+- Konfigurera ACR credentials för container push
+- Testa deployment och validera funktionalitet
+
+---
+
 ### 📋 **STEG 1: Azure DevOps Setup**
 
-#### 1.1 Skapa Project (Om inte redan gjort)
+#### 1.1 ✅ Projekt finns redan!
 ```
-1. Gå till: https://dev.azure.com/
-2. Klicka "New project"
-3. Name: hsq-forms-api
-4. Visibility: Private
-5. Klicka "Create"
+✅ DevOps Projekt: Customforms
+✅ URL: https://dev.azure.com/HQV-DBP/Customforms
+✅ GitHub repo kopplat
 ```
 
-#### 1.2 Koppla GitHub Repository
+#### 1.2 ✅ Pipeline konfiguration klar
 ```
-1. Gå till: Pipelines → Pipelines
-2. Klicka "Create Pipeline"
-3. Välj "GitHub"
-4. Välj repository: hsq-emilkarlsson/hsq-forms-api
-5. Välj "Existing Azure Pipelines YAML file"
-6. Branch: develop
-7. Path: /azure-pipelines.yml
-8. Klicka "Continue"
+✅ azure-pipelines.yml finns och är konfigurerad
+✅ Bicep templates redo för infrastruktur
+✅ Multi-stage pipeline: Test → Infrastructure → Deploy
 ```
 
-### 📋 **STEG 2: Service Connection (Viktigast!)**
+### 📋 **STEG 2: Service Connection (✅ KLART!)**
 
-#### 2.1 Skapa Azure Service Connection
+#### 2.1 ✅ Service Connection Skapad av IT
 ```
-1. Gå till: Project Settings → Service connections
-2. Klicka "New service connection"
-3. Välj "Azure Resource Manager"
-4. Authentication method: Service principal (automatic)
-5. Scope level: Subscription
-6. Subscription: c0b03b12-570f-4442-b337-c9175ad4037f
-7. Service connection name: Azure subscription 1
-8. Grant access permission to all pipelines: ✓
-9. Klicka "Save"
+✅ REDAN KLART! IT-organisationen har skapat service connectionen:
+
+Service Connection: SCON-HAZE-01AA-APP1066-Dev-Martechlab
+- Typ: Azure Resource Manager
+- Autentisering: Workload Identity Federation via OpenID Connect
+- Service Connection ID: 07517baa-1095-43de-ad5c-63dbfbc22f56
+- Subscription: HAZE-01AA-APP1066-Dev-Martechlab
+- Skapad av: Grzegorz Jońca (grzegorz.jonca@husqvarnagroup.com)
+
+🔗 OIDC Issuer: https://login.microsoftonline.com/2a1c169e-715a-412b-b526-05da3f8412fa/v2.0
+🎯 Subject Identifier: /eid1/c/pub/t/hNyCkpxKOG1JgXaP4QS-g/a/IrSbSSETt0KqFYZ8ppdXmA/sc/64ad3665-c01b-443a-a696-99b1d21a0145/07517baa-1095-43de-ad5c-63dbfbc22f56
 ```
 
-**OBS:** Detta är den viktigaste delen! Utan denna kommer pipeline inte kunna skapa Azure resources.
+#### 2.2 Azure DevOps Project Information
+```
+DevOps Projekt: Customforms
+URL: https://dev.azure.com/HQV-DBP/Customforms
+Subscription: HAZE-01AA-APP1066-Dev-Martechlab
+IT-ärende: REQ0964349
+```
+
+**✅ Detta är nu klart! Service connectionen är skapad och kan användas för deployment.**
 
 ### 📋 **STEG 3: Pipeline Variables**
 

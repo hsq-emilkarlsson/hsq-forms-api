@@ -108,34 +108,61 @@ class AzureStorageService:
                 detail=f"Kunde inte validera filtyp för {filename}"
             )
     
-    def _generate_secure_blob_name(self, filename: str, folder: str = "") -> str:
+    def _generate_secure_blob_name(self, filename: str, form_type: str, submission_id: str, field_name: str = None) -> str:
         """
-        Generera säkert blob-namn med UUID för att undvika konflikter
+        Generera säkert blob-namn med organiserad mappstruktur per formulärtyp
+        
+        Mappstruktur:
+        forms/{form_type}/{year}/{month}/{submission_id}/{field_name}_{uuid}_{filename}
+        
+        Exempel:
+        forms/b2b-feedback/2025/08/sub123/attachments_uuid123_document.pdf
+        forms/b2b-support/2025/08/sub456/technical_docs_uuid456_manual.pdf
         """
+        from datetime import datetime
+        
         # Säkra filnamnet
         safe_filename = "".join(c for c in filename if c.isalnum() or c in ".-_").strip()
         if not safe_filename:
             safe_filename = "unknown_file"
         
-        # Skapa unikt blob-namn
-        unique_id = str(uuid.uuid4())
-        blob_name = f"{unique_id}_{safe_filename}"
+        # Skapa unikt ID
+        unique_id = str(uuid.uuid4())[:8]  # Kortare UUID för läsbarhet
         
-        if folder:
-            blob_name = f"{folder}/{blob_name}"
+        # Bygg mappstruktur
+        now = datetime.utcnow()
+        year = now.strftime("%Y")
+        month = now.strftime("%m")
         
-        return blob_name
-    
-    async def upload_file(self, file: UploadFile, submission_id: str) -> Tuple[str, int, str]:
+        # Säkra form_type namn
+        safe_form_type = "".join(c for c in form_type if c.isalnum() or c in "-_").strip()
+        if not safe_form_type:
+            safe_form_type = "general"
+        
+        # Bygg filnamn med field_name prefix om det finns
+        if field_name:
+            safe_field_name = "".join(c for c in field_name if c.isalnum() or c in "-_").strip()
+            file_prefix = f"{safe_field_name}_{unique_id}"
+        else:
+            file_prefix = f"file_{unique_id}"
+        
+        # Fullständig sökväg
+        blob_path = f"forms/{safe_form_type}/{year}/{month}/{submission_id}/{file_prefix}_{safe_filename}"
+        
+        return blob_path
+
+    async def upload_file(self, file: UploadFile, submission_id: str, form_type: str, field_name: str = None) -> Tuple[str, int, str, str]:
         """
-        Ladda upp fil till Azure Blob Storage med retry logic och error handling
+        Ladda upp fil till Azure Blob Storage med organiserad mappstruktur
         
         Args:
             file: FastAPI UploadFile object
             submission_id: ID för submission som filen tillhör
+            form_type: Typ av formulär (b2b-feedback, b2b-support, etc.)
+            field_name: Namn på fältet som filen tillhör (optional)
             
         Returns:
-            Tuple[str, int, str]: (blob_name, file_size, content_type)
+            Tuple[str, int, str, str]: (blob_path, file_size, content_type, blob_url)
         """
         try:
             await self._ensure_containers_exist()
@@ -154,22 +181,27 @@ class AzureStorageService:
             # Validera filtyp
             content_type = self._validate_file_type(file_content, file.filename or "unknown")
             
-            # Generera säkert blob-namn
-            blob_name = self._generate_secure_blob_name(
+            # Generera säkert blob-namn med mappstruktur
+            blob_path = self._generate_secure_blob_name(
                 file.filename or "unknown", 
-                f"submissions/{submission_id}"
+                form_type,
+                submission_id,
+                field_name
             )
             
             # Upload till Azure med retry logic
             container_client = self.blob_service_client.get_container_client(self.container_name)
-            blob_client = container_client.get_blob_client(blob_name)
+            blob_client = container_client.get_blob_client(blob_path)
             
-            # Metadata för spårning
+            # Metadata för spårning och organisation
             metadata = {
                 "original_filename": file.filename or "unknown",
                 "submission_id": submission_id,
+                "form_type": form_type,
+                "field_name": field_name or "general",
                 "content_type": content_type,
-                "upload_source": "api"
+                "upload_source": "api",
+                "upload_timestamp": str(int(asyncio.get_event_loop().time()))
             }
             
             # Upload med retry (Azure SDK hanterar detta automatiskt)
@@ -181,9 +213,13 @@ class AzureStorageService:
                 overwrite=True  # I fall av duplicat blob_name
             )
             
-            logger.info(f"File uploaded successfully to Azure: {file.filename} -> {blob_name}")
+            # Skapa full blob URL
+            blob_url = f"https://{self.account_name}.blob.core.windows.net/{self.container_name}/{blob_path}"
             
-            return blob_name, file_size, content_type
+            logger.info(f"File uploaded successfully to Azure: {file.filename} -> {blob_path}")
+            logger.info(f"Organized in folder structure: forms/{form_type}/")
+            
+            return blob_path, file_size, content_type, blob_url
             
         except HTTPException:
             raise

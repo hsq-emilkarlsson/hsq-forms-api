@@ -86,7 +86,7 @@ This document outlines the comprehensive deployment strategy for the HSQ Forms A
 ACR_LOGIN_SERVER: hsqformsdevacr.azurecr.io
 ACR_USERNAME: hsqformsdevacr
 ACR_PASSWORD: [Secure variable from ACR admin credentials]
-AZURE_SUBSCRIPTION_ID: c0b03b12-570f-4442-b337-c9175ad4037f
+AZURE_SUBSCRIPTION_ID: HAZE-01AA-APP1066-Dev-Martechlab
 RESOURCE_GROUP: rg-hsq-forms-dev-westeu
 CONTAINER_APP_NAME: hsq-forms-api-dev
 ```

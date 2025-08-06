@@ -61,7 +61,7 @@ const B2CReturnsForm = ({ isEmbedded = false, compact = false }: B2CReturnsFormP
       // Using B2B Support template temporarily for B2C returns
       const templateId = '958915ec-fed1-4e7e-badd-4598502fe6a1';
       
-      const response = await fetch(`${apiUrl}/templates/${templateId}/submit`, {
+      const response = await fetch(`${apiUrl}/api/templates/${templateId}/submit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

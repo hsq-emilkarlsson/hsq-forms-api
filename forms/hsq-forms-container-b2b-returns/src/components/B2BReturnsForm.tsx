@@ -41,14 +41,14 @@ const B2BReturnsForm = () => {
     
     try {
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-      const response = await fetch(`${apiUrl}/api/forms/submit`, {
+      const response = await fetch(`${apiUrl}/api/templates/b2b-returns/submit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          form_type: 'b2b-returns',
           data: data,
+          submitted_from: 'B2B Returns Form - Sitecore Embedded'
         }),
       });
       

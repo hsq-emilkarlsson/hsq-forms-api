@@ -1,19 +1,24 @@
 """
 API routes for the HSQ Forms API
 """
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, Form
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+import json
 
 from src.forms_api.db import get_db
-from src.forms_api.models import FormTemplate, FormSubmission
+from src.forms_api.models import FormTemplate, FormSubmission, FlexibleFormAttachment
 from src.forms_api.schemas import (
     FormTemplateCreate, 
     FormTemplateResponse, 
     FormSubmissionCreate, 
     FormSubmissionResponse,
+    FormSubmissionWithFilesCreate,
+    FormSubmissionWithFilesResponse,
+    FileAttachmentResponse,
+    FileUploadResponse,
     CustomerValidationRequest,
     CustomerValidationResponse,
     B2BSupportSubmissionRequest,
@@ -23,12 +28,24 @@ from src.forms_api.services import FormBuilderService
 from src.forms_api.esb_service import esb_service
 from src.forms_api.mock_esb_service import mock_esb_service
 from src.forms_api.config import get_settings
+from src.forms_api.services.storage.azure_storage import AzureStorageService
+from src.forms_api.services.storage.local_storage import LocalStorageService
 import httpx
 import logging
 import os
 
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
+logger = logging.getLogger(__name__)
+
+# Storage service dependency
+def get_storage_service():
+    """Get storage service based on configuration"""
+    settings = get_settings()
+    if settings.storage_type == "azure":
+        return AzureStorageService()
+    else:
+        return LocalStorageService()
 
 
 @router.post("/templates", response_model=FormTemplateResponse)
@@ -110,6 +127,243 @@ def get_submissions(
     """Get all submissions for a template - Admin endpoint"""
     submissions = db.query(FormSubmission).filter(FormSubmission.template_id == template_id).all()
     return [FormSubmissionResponse.model_validate(s) for s in submissions]
+
+
+# File upload endpoints
+@router.post("/templates/{template_id}/upload", response_model=FileUploadResponse)
+@limiter.limit("10/minute")  # File upload - moderate rate limit
+async def upload_file_to_template(
+    request: Request,
+    template_id: str,
+    file: UploadFile = File(...),
+    field_name: str = Form(...),
+    submission_id: Optional[str] = Form(None),
+    db: Session = Depends(get_db),
+    storage_service = Depends(get_storage_service)
+):
+    """
+    Upload file for a specific template and form submission
+    Organiserar filer i mappstruktur: forms/{template_id}/{year}/{month}/{submission_id}/
+    """
+    try:
+        # Validate template exists
+        template = db.query(FormTemplate).filter(FormTemplate.id == template_id).first()
+        if not template:
+            raise HTTPException(status_code=404, detail="Template not found")
+        
+        # If no submission_id provided, we're doing a temporary upload
+        if not submission_id:
+            import uuid
+            submission_id = f"temp_{str(uuid.uuid4())[:8]}"
+        
+        # Validate file size and type
+        settings = get_settings()
+        if hasattr(file, 'size') and file.size > settings.max_attachment_size_mb * 1024 * 1024:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"File too large. Max size: {settings.max_attachment_size_mb}MB"
+            )
+        
+        # Upload file with organized folder structure
+        form_type = template_id  # Use template_id as form_type
+        blob_path, file_size, content_type, blob_url = await storage_service.upload_file(
+            file=file,
+            submission_id=submission_id,
+            form_type=form_type,
+            field_name=field_name
+        )
+        
+        # Create attachment record
+        attachment = FlexibleFormAttachment(
+            submission_id=submission_id,
+            field_name=field_name,
+            original_filename=file.filename or "unknown",
+            stored_filename=blob_path.split('/')[-1],  # Just the filename part
+            file_size=file_size,
+            content_type=content_type,
+            blob_url=blob_url if hasattr(storage_service, 'account_name') else None,
+            upload_status="uploaded",
+            form_type=form_type,
+            storage_path=blob_path
+        )
+        
+        db.add(attachment)
+        db.commit()
+        db.refresh(attachment)
+        
+        logger.info(f"File uploaded successfully: {file.filename} -> {blob_path}")
+        
+        return FileUploadResponse(
+            success=True,
+            attachment_id=attachment.id,
+            filename=file.filename or "unknown",
+            file_size=file_size,
+            content_type=content_type,
+            storage_path=blob_path,
+            message=f"File uploaded successfully to {form_type} folder structure"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"File upload error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+
+
+@router.post("/templates/{template_id}/submit-with-files", response_model=FormSubmissionWithFilesResponse)
+@limiter.limit("10/minute")  # Form submission with files - moderate rate limit  
+async def submit_form_with_files(
+    request: Request,
+    template_id: str,
+    data: str = Form(...),  # JSON string of form data
+    submitted_from: Optional[str] = Form(None),
+    files: List[UploadFile] = File(default=[]),
+    file_fields: List[str] = Form(default=[]),  # Which field each file belongs to
+    db: Session = Depends(get_db),
+    storage_service = Depends(get_storage_service)
+):
+    """
+    Submit form data with file attachments
+    Skapar submission först, sedan laddar upp filer till rätt mappar
+    """
+    try:
+        # Validate template exists
+        template = db.query(FormTemplate).filter(FormTemplate.id == template_id).first()
+        if not template:
+            raise HTTPException(status_code=404, detail="Template not found")
+        
+        # Parse form data
+        try:
+            form_data = json.loads(data)
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Invalid JSON in form data")
+        
+        # Create form submission first
+        ip_address = request.client.host if request.client else None
+        submission = FormSubmission(
+            template_id=template_id,
+            data=form_data,
+            submitted_from=submitted_from,
+            ip_address=ip_address
+        )
+        db.add(submission)
+        db.commit()
+        db.refresh(submission)
+        
+        # Upload files if any
+        attachments = []
+        if files and len(files) > 0:
+            # Ensure we have field names for each file
+            if len(file_fields) != len(files):
+                # If not enough field names, use generic names
+                file_fields = file_fields + [f"attachment_{i}" for i in range(len(file_fields), len(files))]
+            
+            for file, field_name in zip(files, file_fields):
+                if file.filename:  # Skip empty files
+                    try:
+                        # Upload with organized folder structure
+                        blob_path, file_size, content_type, blob_url = await storage_service.upload_file(
+                            file=file,
+                            submission_id=submission.id,
+                            form_type=template_id,
+                            field_name=field_name
+                        )
+                        
+                        # Create attachment record
+                        attachment = FlexibleFormAttachment(
+                            submission_id=submission.id,
+                            field_name=field_name,
+                            original_filename=file.filename,
+                            stored_filename=blob_path.split('/')[-1],
+                            file_size=file_size,
+                            content_type=content_type,
+                            blob_url=blob_url if hasattr(storage_service, 'account_name') else None,
+                            upload_status="uploaded",
+                            form_type=template_id,
+                            storage_path=blob_path
+                        )
+                        
+                        db.add(attachment)
+                        attachments.append(attachment)
+                        
+                    except Exception as e:
+                        logger.error(f"Failed to upload file {file.filename}: {str(e)}")
+                        # Continue with other files, but log the error
+        
+        db.commit()
+        
+        # Refresh attachments from DB
+        for attachment in attachments:
+            db.refresh(attachment)
+        
+        logger.info(f"Form submitted with {len(attachments)} files to {template_id} folder structure")
+        
+        # Return response with attachments
+        response_data = FormSubmissionResponse.model_validate(submission)
+        attachment_responses = [FileAttachmentResponse.model_validate(att) for att in attachments]
+        
+        return FormSubmissionWithFilesResponse(
+            **response_data.model_dump(),
+            attachments=attachment_responses
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Form submission with files error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Submission failed: {str(e)}")
+
+
+@router.get("/attachments/{attachment_id}", response_model=FileAttachmentResponse)
+@limiter.limit("30/minute")  # File info endpoint - higher rate limit
+def get_attachment_info(
+    request: Request,
+    attachment_id: str,
+    db: Session = Depends(get_db)
+):
+    """Get file attachment information"""
+    attachment = db.query(FlexibleFormAttachment).filter(FlexibleFormAttachment.id == attachment_id).first()
+    if not attachment:
+        raise HTTPException(status_code=404, detail="Attachment not found")
+    
+    return FileAttachmentResponse.model_validate(attachment)
+
+
+@router.delete("/attachments/{attachment_id}")
+@limiter.limit("10/minute")  # Delete endpoint - moderate rate limit
+async def delete_attachment(
+    request: Request,
+    attachment_id: str,
+    db: Session = Depends(get_db),
+    storage_service = Depends(get_storage_service)
+):
+    """Delete file attachment from storage and database"""
+    try:
+        # Get attachment record
+        attachment = db.query(FlexibleFormAttachment).filter(FlexibleFormAttachment.id == attachment_id).first()
+        if not attachment:
+            raise HTTPException(status_code=404, detail="Attachment not found")
+        
+        # Delete from storage
+        try:
+            if hasattr(storage_service, 'delete_file'):
+                await storage_service.delete_file(attachment.storage_path, attachment.submission_id)
+        except Exception as e:
+            logger.warning(f"Failed to delete file from storage: {str(e)}")
+            # Continue to delete DB record even if storage deletion fails
+        
+        # Delete from database
+        db.delete(attachment)
+        db.commit()
+        
+        return {"success": True, "message": "Attachment deleted successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Delete attachment error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Delete failed: {str(e)}")
+
 
 
 # ESB Integration endpoints

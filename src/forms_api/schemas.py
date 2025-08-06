@@ -55,6 +55,56 @@ class FormSubmissionResponse(BaseModel):
     created_at: datetime
 
 
+# File attachment schemas
+class FileAttachmentResponse(BaseModel):
+    """Schema for file attachment response"""
+    model_config = ConfigDict(from_attributes=True)
+    
+    id: str
+    submission_id: str
+    field_name: str
+    original_filename: str
+    stored_filename: str
+    file_size: int
+    content_type: str
+    blob_url: Optional[str]
+    upload_status: str
+    form_type: str
+    storage_path: str
+    created_at: datetime
+
+
+class FileUploadResponse(BaseModel):
+    """Schema for file upload response"""
+    success: bool = Field(..., description="Upload success")
+    attachment_id: str = Field(..., description="Attachment ID")
+    filename: str = Field(..., description="Original filename")
+    file_size: int = Field(..., description="File size in bytes")
+    content_type: str = Field(..., description="MIME content type")
+    storage_path: str = Field(..., description="Storage path with folder structure")
+    message: str = Field(..., description="Success message")
+
+
+class FormSubmissionWithFilesCreate(BaseModel):
+    """Schema for form submission with file attachments"""
+    data: Dict[str, Any] = Field(..., description="Form data")
+    submitted_from: Optional[str] = Field(None, description="App/site that submitted this")
+    form_type: str = Field(..., description="Type of form (b2b-feedback, b2b-support, etc.)")
+
+
+class FormSubmissionWithFilesResponse(BaseModel):
+    """Schema for form submission response with attachments"""
+    model_config = ConfigDict(from_attributes=True)
+    
+    id: str
+    template_id: str
+    data: Dict[str, Any]
+    submitted_from: Optional[str]
+    ip_address: Optional[str]
+    created_at: datetime
+    attachments: List[FileAttachmentResponse] = Field(default_factory=list)
+
+
 # ESB Integration schemas
 class CustomerValidationRequest(BaseModel):
     """Schema for customer validation request"""

@@ -28,7 +28,7 @@ variables:
   ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/develop') }}:
     acrName: 'hsqformsdevacr'
     environment: 'dev'
-    subscriptionId: 'c0b03b12-570f-4442-b337-c9175ad4037f'
+    subscriptionId: 'HAZE-01AA-APP1066-Dev-Martechlab'
     resourceGroupName: 'rg-hsq-forms-dev'
 
 stages:
@@ -70,7 +70,7 @@ stages:
     - task: AzureCLI@2
       displayName: 'Check Available Service Connections'
       inputs:
-        azureSubscription: 'Azure subscription 1'
+        azureSubscription: 'SCON-HAZE-01AA-APP1066-Dev-Martechlab'
         scriptType: 'bash'
         scriptLocation: 'inlineScript'
         inlineScript: |
@@ -84,7 +84,7 @@ stages:
     - task: AzureCLI@2
       displayName: 'Deploy Bicep Template'
       inputs:
-        azureSubscription: 'Azure subscription 1'
+        azureSubscription: 'SCON-HAZE-01AA-APP1066-Dev-Martechlab'
         scriptType: 'bash'
         scriptLocation: 'inlineScript'
         inlineScript: |

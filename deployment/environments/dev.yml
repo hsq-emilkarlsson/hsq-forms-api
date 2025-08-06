@@ -4,7 +4,7 @@
 environment:
   name: dev
   displayName: Development
-  subscription: c0b03b12-570f-4442-b337-c9175ad4037f
+  subscription: HAZE-01AA-APP1066-Dev-Martechlab
   subscriptionName: HAZE-01AA-APP1066-Dev-Martechlab
   region: westeurope
 

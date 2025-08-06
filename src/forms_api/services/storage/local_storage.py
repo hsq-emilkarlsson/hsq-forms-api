@@ -67,12 +67,38 @@ class LocalFileStorageService:
         secure_name = f"{uuid.uuid4()}{file_ext}"
         return secure_name
     
-    async def upload_file(self, file: UploadFile, submission_id: str) -> Tuple[str, int, str]:
+    def _generate_folder_structure(self, form_type: str, submission_id: str) -> str:
         """
-        Ladda upp fil till lokal lagring
+        Generera mappstruktur för lokal lagring som matchar Azure
+        
+        Struktur: forms/{form_type}/{year}/{month}/{submission_id}/
+        """
+        from datetime import datetime
+        
+        now = datetime.utcnow()
+        year = now.strftime("%Y")
+        month = now.strftime("%m")
+        
+        # Säkra form_type namn
+        safe_form_type = "".join(c for c in form_type if c.isalnum() or c in "-_").strip()
+        if not safe_form_type:
+            safe_form_type = "general"
+        
+        folder_path = f"forms/{safe_form_type}/{year}/{month}/{submission_id}"
+        return folder_path
+    
+    async def upload_file(self, file: UploadFile, submission_id: str, form_type: str, field_name: str = None) -> Tuple[str, int, str, str]:
+        """
+        Ladda upp fil till lokal lagring med organiserad mappstruktur
+        
+        Args:
+            file: FastAPI UploadFile object
+            submission_id: ID för submission som filen tillhör
+            form_type: Typ av formulär (b2b-feedback, b2b-support, etc.)
+            field_name: Namn på fältet som filen tillhör (optional)
         
         Returns:
-            Tuple[str, int, str]: (file_id, file_size, content_type)
+            Tuple[str, int, str, str]: (storage_path, file_size, content_type, local_url)
         """
         try:
             # Läs filinnehåll
@@ -89,22 +115,39 @@ class LocalFileStorageService:
             # Validera filtyp
             content_type = self._validate_file_type(file_content, file.filename or "unknown")
             
-            # Generera säkert filnamn
-            secure_filename = self._generate_secure_filename(file.filename or "unknown")
-            file_id = str(uuid.uuid4())
+            # Skapa mappstruktur
+            folder_structure = self._generate_folder_structure(form_type, submission_id)
+            full_upload_dir = self.upload_dir / folder_structure
+            full_upload_dir.mkdir(parents=True, exist_ok=True)
             
-            # Skapa submission-specifik mapp
-            submission_dir = self.upload_dir / submission_id
-            submission_dir.mkdir(exist_ok=True)
+            # Generera säkert filnamn med field_name prefix
+            file_ext = Path(file.filename or "unknown").suffix.lower()
+            unique_id = str(uuid.uuid4())[:8]
+            
+            if field_name:
+                safe_field_name = "".join(c for c in field_name if c.isalnum() or c in "-_").strip()
+                filename = f"{safe_field_name}_{unique_id}_{file.filename or 'unknown'}"
+            else:
+                filename = f"file_{unique_id}_{file.filename or 'unknown'}"
+            
+            # Säkra filnamnet
+            safe_filename = "".join(c for c in filename if c.isalnum() or c in ".-_").strip()
+            
+            # Fullständig filsökväg
+            file_path = full_upload_dir / safe_filename
+            storage_path = f"{folder_structure}/{safe_filename}"
             
             # Spara fil
-            file_path = submission_dir / f"{file_id}_{secure_filename}"
             with open(file_path, "wb") as f:
                 f.write(file_content)
             
-            logger.info(f"File uploaded successfully: {file.filename} -> {file_path}")
+            # Skapa lokal URL
+            local_url = f"file://{file_path.absolute()}"
             
-            return file_id, file_size, content_type
+            logger.info(f"File uploaded successfully: {file.filename} -> {storage_path}")
+            logger.info(f"Organized in folder structure: {folder_structure}")
+            
+            return storage_path, file_size, content_type, local_url
             
         except HTTPException:
             raise
