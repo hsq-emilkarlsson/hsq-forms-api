@@ -93,9 +93,9 @@ stages:
         resourceGroupName: '$(resourceGroupName)'
         location: 'West Europe'
         templateLocation: 'Linked artifact'
-        csmFile: 'infra/main.bicep'
-        csmParametersFile: 'infra/main.parameters.$(environment).json'
-        overrideParameters: '-dbAdminPassword "$(DB_ADMIN_PASSWORD)"'
+        csmFile: 'infra/main-minimal.bicep'
+        csmParametersFile: 'infra/main-minimal.parameters.dev.json'
+        overrideParameters: ''
         deploymentMode: 'Incremental'
         deploymentName: 'hsq-forms-$(environment)-$(Build.BuildNumber)'
         
