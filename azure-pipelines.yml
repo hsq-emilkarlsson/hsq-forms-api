@@ -104,55 +104,47 @@ stages:
   condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/develop'))
   dependsOn: Infrastructure
   jobs:
-  - deployment: DeployDev
+  - job: DeployDev
     displayName: 'Deploy to DEV Environment'
-    environment: 'dev'
     pool:
       vmImage: 'ubuntu-latest'
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-          - checkout: self
-          
-          - script: |
-              echo "🚀 Starting DEV deployment..."
-              echo "ACR: $(acrName).azurecr.io"
-              echo "Image: $(imageRepository):$(tag)"
-              echo "Resource Group: $(resourceGroupName)"
-            displayName: 'Deployment Info'
-          
-          - script: |
-              echo "✅ DEV infrastructure should be deployed!"
-              echo "📋 Next: Configure ACR service connection for Docker push"
-              echo "🔗 ACR Name: $(acrName)"
-              echo "📍 Resource Group: $(resourceGroupName)"
-              echo ""
-              echo "🎯 Manual steps needed:"
-              echo "1. Create ACR service connection: $(acrName)"
-              echo "2. Add Docker build/push tasks"
-              echo "3. Configure Container App deployment"
-            displayName: 'DEV Deployment Status'
+    steps:
+    - checkout: self
+    
+    - script: |
+        echo "🚀 Starting DEV deployment..."
+        echo "ACR: $(acrName).azurecr.io"
+        echo "Image: $(imageRepository):$(tag)"
+        echo "Resource Group: $(resourceGroupName)"
+      displayName: 'Deployment Info'
+    
+    - script: |
+        echo "✅ DEV infrastructure should be deployed!"
+        echo "📋 Next: Configure ACR service connection for Docker push"
+        echo "🔗 ACR Name: $(acrName)"
+        echo "📍 Resource Group: $(resourceGroupName)"
+        echo ""
+        echo "🎯 Manual steps needed:"
+        echo "1. Create ACR service connection: $(acrName)"
+        echo "2. Add Docker build/push tasks"
+        echo "3. Configure Container App deployment"
+      displayName: 'DEV Deployment Status'
 
 - stage: BuildAndDeployProd
   displayName: 'Build & Deploy to PROD'
   condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
   dependsOn: Infrastructure
   jobs:
-  - deployment: DeployProd
+  - job: DeployProd
     displayName: 'Deploy to PROD Environment'
-    environment: 'prod'
     pool:
       vmImage: 'ubuntu-latest'
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-          - checkout: self
-          
-          - script: |
-              echo "🚀 Starting PROD deployment..."
-              echo "ACR: $(acrName).azurecr.io"
-              echo "Image: $(imageRepository):$(tag)"
-              echo "Resource Group: $(resourceGroupName)"
-            displayName: 'Deployment Info'
+    steps:
+    - checkout: self
+    
+    - script: |
+        echo "🚀 Starting PROD deployment..."
+        echo "ACR: $(acrName).azurecr.io"
+        echo "Image: $(imageRepository):$(tag)"
+        echo "Resource Group: $(resourceGroupName)"
+      displayName: 'Deployment Info'
