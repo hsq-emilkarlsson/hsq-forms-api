@@ -47,6 +47,7 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
     supportsHttpsTrafficOnly: true
     minimumTlsVersion: 'TLS1_2'
     allowBlobPublicAccess: false
+    publicNetworkAccess: 'Disabled'
     encryption: {
       services: {
         blob: {
@@ -194,30 +195,9 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
     configuration: {
       activeRevisionsMode: 'Single'
       ingress: {
-        external: environmentName == 'dev' ? true : false  // DEV external för testing, PROD internal
+        external: false  // Ingen extern åtkomst pga Azure Policy
         targetPort: 8000
         transport: 'http'
-        corsPolicy: environmentName == 'dev' ? {
-          allowedOrigins: [
-            'http://localhost:3000'
-            'http://localhost:5173'
-            'http://localhost:8080'
-            'http://127.0.0.1:3000'
-            'http://127.0.0.1:5173'
-            'http://127.0.0.1:8080'
-          ]
-          allowedMethods: ['GET', 'POST', 'OPTIONS']
-          allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key']
-          allowCredentials: false
-        } : {
-          allowedOrigins: [
-            'https://husqvarnagroup.com'
-            'https://*.husqvarnagroup.com'
-          ]
-          allowedMethods: ['GET', 'POST', 'OPTIONS']
-          allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key']
-          allowCredentials: false
-        }
       }
       secrets: [
         {
