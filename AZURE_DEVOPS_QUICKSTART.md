@@ -2,20 +2,20 @@
 
 ## 🎯 Mål: Få igång allt via Azure DevOps steg för steg
 
-### 📋 **STATUS: Projektet är DEPLOYMENT-KLART! ✅**
+### 📋 **STATUS: TEKNISKT KLART - Pending Network Permissions ✅**
 
 **✅ FÄRDIGT:**
 - Service Connection skapad av IT-organisation
-- Bicep templates för infrastruktur (API, DB, Storage, Container Apps)
-- Azure Pipeline konfiguration
-- Container images för API + alla formulär
+- Bicep templates för policy-compliant infrastruktur (API, DB, Storage, Container Apps)
+- Azure Pipeline med ARM Template deployment
+- Container Apps med `ingressExternal: false` (privat endpoint)
+- Container Apps Environment med `internal: true` (VNet integration)
 - Database migrations och schemas
 - File upload-hantering med Azure Storage
 
-**⚠️ ÅTERSTÅR:**
-- Köra första pipeline-deploys för att skapa infrastruktur
-- Konfigurera ACR credentials för container push
-- Testa deployment och validera funktionalitet
+**⏳ ÅTERSTÅR:**
+- Network permissions för VNet creation (IT-request skickat)
+- Efter permissions: Automatisk deployment via pipeline
 
 ---
 

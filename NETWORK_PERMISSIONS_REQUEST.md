@@ -2,21 +2,20 @@
 
 ## 🎯 Sammanfattning
 **Projekt:** HSQ Forms API Deployment  
-**Status:** Blockerat av Azure Policy compliance + Network permissions  
-**Lösning:** Utökade Azure permissions krävs för full deployment
+**Status:** ✅ Policy-compliant template redo - Endast Network permissions krävs  
+**Lösning:** Utökade Azure permissions krävs för VNet-baserad deployment
 
 ---
 
-## 🚨 **AKTUELLT PROBLEM**
+## ✅ **PROBLEM LÖST - TEKNISK UPPDATERING**
 
-### Azure Policy Blockering:
-```
-Policy: "Container Apps environment should disable public network access"
-Assignment: "deny-paas-public-dev"
-Management Group: "mg-development"
-```
+### ✅ Container App Policy Compliance:
+- **Fixed:** Pipeline nu använder `infra/main-ready.bicep` 
+- **Fixed:** Container App har `ingressExternal: false` (privat endpoint)
+- **Fixed:** Container Apps Environment är `internal: true`
+- **Ready:** All kod följer Azure Policy requirements
 
-### Permission som saknas:
+### Network permissions behövs fortfarande:
 ```
 Microsoft.Network/virtualNetworks/write
 Microsoft.Network/virtualNetworks/subnets/write
