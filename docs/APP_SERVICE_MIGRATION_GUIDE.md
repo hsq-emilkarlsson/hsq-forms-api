@@ -15,9 +15,9 @@ Detta dokument beskriver migreringen från Azure Container Apps till Azure App S
 
 ## Migreringssteg
 
-1. **Infrastruktur**: Ny Bicep-mall `infra/main-appservice.bicep` har skapats
+1. **Infrastruktur**: Ny Bicep-mall `infra/bicep/main.bicep` har skapats
 2. **Pipeline**: Azure Pipeline har uppdaterats för App Service-deployment
-3. **Parametrar**: Nya parameterfiler `infra/main-appservice.parameters.json`
+3. **Parametrar**: Nya parameterfiler `infra/bicep/main.parameters.json`
 4. **Konfiguration**: App-inställningar har anpassats för App Service Python-runtime
 
 ## Resursjämförelse

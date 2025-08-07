@@ -11,7 +11,7 @@ HSQ Forms API är en applikation som gör det möjligt att:
 
 ## 🏗️ Infrastruktur
 
-Projektet använder en enda Bicep-mall (`infra/main-appservice.bicep`) med en konfiguration som kan anpassas för olika miljöer (utveckling/produktion) via parametrar.
+Projektet använder en enda Bicep-mall (`infra/bicep/main.bicep`) med en konfiguration som kan anpassas för olika miljöer (utveckling/produktion) via parametrar.
 
 ### Resurser som skapas:
 - **App Service** - För att köra API:et som en Python-applikation
@@ -44,8 +44,8 @@ Projektet använder en enda Bicep-mall (`infra/main-appservice.bicep`) med en ko
     resourceGroupName: '$(resourceGroupName)'
     location: '$(location)'
     templateLocation: 'Linked artifact'
-    csmFile: 'infra/main-appservice.bicep'
-    csmParametersFile: 'infra/main-appservice.parameters.json'
+    csmFile: 'infra/bicep/main.bicep'
+    csmParametersFile: 'infra/bicep/main.parameters.json'
     overrideParameters: '-environmentName $(environment) -projectName $(projectName) -dbAdminPassword $(dbAdminPassword) -appServiceSku $(appServiceSku)'
 ```
 

@@ -38,13 +38,13 @@ HSQ Forms API stödjer två miljöer:
 
 ### 1. Skapa infrastrukturen
 
-Infrastrukturen skapas med Bicep-mallen `infra/main-appservice.bicep`. Parametrar konfigureras i `infra/main-appservice.parameters.json`.
+Infrastrukturen skapas med Bicep-mallen `infra/bicep/main.bicep`. Parametrar konfigureras i `infra/bicep/main.parameters.json`.
 
 ```bash
 az deployment group create \
   --resource-group <resource-group-name> \
-  --template-file infra/main-appservice.bicep \
-  --parameters infra/main-appservice.parameters.json \
+  --template-file infra/bicep/main.bicep \
+  --parameters infra/bicep/main.parameters.json \
   --parameters environmentName=<environment> \
   --parameters dbAdminPassword=<secure-password>
 ```
