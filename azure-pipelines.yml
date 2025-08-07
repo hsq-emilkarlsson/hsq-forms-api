@@ -93,11 +93,11 @@ stages:
         resourceGroupName: '$(resourceGroupName)'
         location: 'West Europe'
         templateLocation: 'Linked artifact'
-        csmFile: 'infra/main-avm.bicep'
-        csmParametersFile: 'infra/main-avm.parameters.dev.json'
+        csmFile: 'infra/main-no-vnet.bicep'  # 🧪 TEST: NO-VNet approach
+        csmParametersFile: 'infra/main-no-vnet.parameters.dev.json'
         overrideParameters: ''
         deploymentMode: 'Incremental'
-        deploymentName: 'hsq-forms-$(environment)-$(Build.BuildNumber)'
+        deploymentName: 'hsq-forms-no-vnet-$(environment)-$(Build.BuildNumber)'
         
     - task: AzureCLI@2
       displayName: 'List Deployed Resources'
