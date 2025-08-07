@@ -73,7 +73,7 @@ stages:
         resourceGroupName: '$(resourceGroupName)'
         location: '$(location)'
         templateLocation: 'Linked artifact'
-        csmFile: 'infra/main-appservice.bicep'
+        csmFile: 'infra/main-appservice-vnet.bicep'
         csmParametersFile: 'infra/main-appservice.parameters.json'
         overrideParameters: >-
           -environmentName $(environment)
