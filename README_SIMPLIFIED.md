@@ -47,11 +47,12 @@ Projektet använder en enda Bicep-mall (`infra/main-appservice.bicep`) med en ko
     csmFile: 'infra/main-appservice.bicep'
     csmParametersFile: 'infra/main-appservice.parameters.json'
     overrideParameters: '-environmentName $(environment) -projectName $(projectName) -dbAdminPassword $(dbAdminPassword) -appServiceSku $(appServiceSku)'
+    deploymentMode: 'Incremental'
 ```
 
 ## 📝 Parametersfil
 
-Parametersfilen (`infra/main.parameters.unified.json`) innehåller alla nödvändiga parametrar för deployment:
+Parametersfilen (`infra/main-appservice.parameters.json`) innehåller alla nödvändiga parametrar för deployment:
 
 ```json
 {
@@ -70,14 +71,8 @@ Parametersfilen (`infra/main.parameters.unified.json`) innehåller alla nödvän
     "dbAdminPassword": {
       "value": "REPLACE_WITH_SECURE_PASSWORD_FROM_PIPELINE"
     },
-    "containerAppMinReplicas": {
-      "value": 1
-    },
-    "containerAppMaxReplicas": {
-      "value": 3
-    },
-    "enableVNet": {
-      "value": false
+    "appServiceSku": {
+      "value": "B1"
     }
   }
 }
@@ -85,8 +80,17 @@ Parametersfilen (`infra/main.parameters.unified.json`) innehåller alla nödvän
 
 ## 🔄 Rekommenderad process
 
-1. **Utveckling**: Använd alltid VNet-integration (`enableVNet=true`) enligt Azure Security Policy
-2. **Produktion**: Använd alltid VNet-integration (`enableVNet=true`) för produktionsmiljön
+1. **Utveckling**: Använd `B1` SKU för utveckling och test
+2. **Produktion**: Använd `P1V2` SKU för produktionsmiljön för bättre prestanda och tillförlitlighet
+
+## 📦 Applikationsdistribution
+
+Applikationskoden deployas som en zip-fil till App Service med följande innehåll:
+- main.py
+- src/ (applikationskod)
+- alembic/ (databasmigrering)
+- alembic.ini
+- requirements.txt
 
 ## 🛠️ Felsökning
 
@@ -94,9 +98,11 @@ Parametersfilen (`infra/main.parameters.unified.json`) innehåller alla nödvän
 
 1. **Namnkonflikter**: Azure-resursnamn måste vara globalt unika. Bicep-mallen genererar ett unikt suffix för att undvika konflikter.
 
-2. **VNet-behörigheter**: Om du får "AuthorizationFailed" när VNet är aktiverat, kontrollera att serviceprincipal har rätt behörigheter (Network Contributor).
+2. **App Service-loggning**: Använd Application Insights för detaljerad loggning och övervakning.
 
-3. **Container App åtkomst**: Container App är konfigurerad som intern (internal) enligt Azure Policy. Använd VNet peering eller private endpoints för att få åtkomst.
+3. **Databasmigrering**: Kontrollera att alembic-migreringen har körts korrekt efter deployment.
+
+4. **Python-installation**: App Service använder Python 3.11 runtime. Se till att alla paket är kompatibla.
 
 ### Användbara kommandon:
 

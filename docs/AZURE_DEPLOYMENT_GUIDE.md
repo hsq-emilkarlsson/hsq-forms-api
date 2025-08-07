@@ -1,1 +1,150 @@
-# 🚀 HSQ Forms API – Azure Deployment GuideSenast uppdaterad: 2025-06-05## 📋 ÖversiktDenna guide visar hur du deployar HSQ Forms API till Azure med modern Azure Developer CLI (azd) workflow:- **Azure Container Apps** - för API hosting med autoscaling- **Azure Database for PostgreSQL Flexible Server** - för databas- **Azure Blob Storage** - för filuppladdningar med Managed Identity säkerhet- **Azure Container Registry** - för Docker images- **Azure Log Analytics** - för monitorering och logging## 🏗️ Arkitektur```┌─────────────────────────────────────────────────────────────────┐│                    Azure Resource Group                         │├─────────────────────────────────────────────────────────────────┤│  ┌─────────────────┐  ┌──────────────────┐  ┌─────────────────┐ ││  │   Container     │  │   PostgreSQL     │  │   Storage       │ ││  │     Apps        │  │   Flexible       │  │   Account       │ ││  │   Environment   │  │     Server       │  │                 │ ││  │                 │  │                  │  │  ┌───────────┐  │ ││  │  ┌───────────┐  │  │  Database:       │  │  │ Blob      │  │ ││  │  │ HSQ Forms │◄─┼──┼─► hsq_forms     │  │  │ Container │  │ ││  │  │    API    │  │  │                  │  │  │ uploads   │  │ ││  │  └─────┬─────┘  │  │                  │  │  └───────────┘  │ ││  │        │        │  │                  │  │                 │ ││  │  ┌─────▼─────┐  │  │                  │  │  Managed        │ ││  │  │ Managed   │  │  │                  │  │  Identity       │ ││  │  │ Identity  │──┼──┼──────────────────┼──┼─►Authentication │ ││  │  └───────────┘  │  │                  │  │                 │ ││  └─────────────────┘  └──────────────────┘  └─────────────────┘ │└─────────────────────────────────────────────────────────────────┘```## 🛠️ FörutsättningarInnan du börjar, se till att du har:1. **Azure CLI** installerat och inloggat2. **Azure Developer CLI (azd)** installerat3. **Docker** installerat och igång4. **Git** för versionshantering```bash# Installera Azure Developer CLIcurl -fsSL https://aka.ms/install-azd.sh | bash# Logga inazd auth login```## 🚀 Deployment med Azure Developer CLI (rekommenderat)### Steg 1: Förbered miljön```bash# Klona projektet om du inte redan har detgit clone https://github.com/your-org/hsq-forms-api.gitcd hsq-forms-api# Skapa en ny miljö (eller anslut till en befintlig)azd env new hsq-forms-prod# alternativt: azd env refresh```### Steg 2: Konfigurera miljövariabler```bash# Sätt PostgreSQL admin-lösenord (kommer sparas säkert i Azure Key Vault)azd env set POSTGRES_PASSWORD "YourSecurePassword123!"azd env set DBADMINUSERNAME "postgres"# Konfigurera CORS (för produktionsmiljön)azd env set ALLOWED_ORIGINS "https://your-app.com,https://admin.your-app.com"```### Steg 3: Deploy all infrastruktur och kod```bash# Kör en fullständig deploymentazd up```Detta kommando kommer att:1. Provsiona alla Azure-resurser enligt Bicep-templaten2. Bygga Docker-imagen för API:et3. Pusha imagen till Azure Container Registry4. Deploya API:et till Azure Container Apps5. Konfigurera alla nödvändiga miljövariabler### Steg 4: Verifiera deployment```bash# Visa URL:er för deploymentazd env get-values# Testa API:etcurl $(azd env get-values | grep ENDPOINT_URL | cut -d= -f2)```## 📊 Monitorering och logs### Azure Container Apps logs```bash# Visa live logs för APIaz containerapp logs show \  --resource-group rg-hsq-forms-prod \  --name hsq-forms-api \  --follow```### Application InsightsApplikationen skickar telemetridata till Application Insights automatiskt. För att utforska denna data:1. Gå till Azure Portal2. Navigera till Application Insights-resursen i din resursgrupp3. Utforska logs, prestanda, och fel## 🛡️ Säkerhetskonfiguration### Managed IdentityAPI:et använder Managed Identity för att säkert kommunicera med Azure Blob Storage. Inga lagrade nycklar behövs.### PostgreSQL-säkerhetFör ytterligare säkerhetskonfigurationer:```bash# Aktivera SSL för PostgreSQLaz postgres flexible-server parameter set \  --resource-group rg-hsq-forms-prod \  --server-name psql-hsq-forms-prod \  --name ssl_min_protocol_version \  --value TLSv1.2```## 🔄 Kontinuerlig DeploymentFör att konfigurera GitHub Actions för kontinuerlig deployment:1. Kör följande kommando för att konfigurera CI/CD:   ```bash   azd pipeline config   ```2. Följ instruktionerna för att koppla ditt GitHub-repo3. Skapa en service principal för GitHub Actions:   ```bash   az ad sp create-for-rbac --name "hsq-forms-api-github" --role contributor \     --scopes /subscriptions/{SubID}/resourceGroups/rg-hsq-forms-prod \     --sdk-auth   ```4. Lägg till följande secrets i GitHub repo:   - AZURE_CREDENTIALS: Utdata från föregående kommando   - AZURE_ENV_NAME: 'prod'## 📝 Felsökning### Problem med deployment```bash# Kontrollera loggar för Container App deploymentaz containerapp logs show \  --resource-group rg-hsq-forms-prod \  --name hsq-forms-api \  --tail 100# Kontrollera Container Registry problemaz acr build-task logs \  --registry $(az acr list --resource-group rg-hsq-forms-prod --query "[0].name" -o tsv) \  --build-id $(az acr task list-runs --registry $(az acr list --resource-group rg-hsq-forms-prod --query "[0].name" -o tsv) --query "[0].runId" -o tsv)```### Databasproblem```bash# Kontrollera PostgreSQL-loggaraz postgres flexible-server parameter set \  --resource-group rg-hsq-forms-prod \  --server-name psql-hsq-forms-prod \  --name log_statement \  --value all# Health Checkaz postgres flexible-server show \  --resource-group rg-hsq-forms-prod \  --name psql-hsq-forms-prod \  --query "state"```### Storage-problem```bash# Storage Health Checkaz storage account show \  --name $(az storage account list --resource-group rg-hsq-forms-prod --query "[0].name" -o tsv) \  --resource-group rg-hsq-forms-prod \  --query "provisioningState"```## 📋 Checklista för deployment- [ ] Azure CLI och azd installerat- [ ] Logga in på Azure (`az login`, `azd auth login`)- [ ] Klona repo och gå till projektmappen- [ ] Konfigurera environment variabler (`.env`)- [ ] Kör `azd up` för första deployment- [ ] Kontrollera att alla resurser skapats korrekt- [ ] Testa API endpoints- [ ] Konfigurera CI/CD pipeline (valfritt)- [ ] Konfigurera monitorering och alerting- [ ] Dokumentera deployment-specifika inställningar## 🎯 Nästa stegEfter framgångsrik deployment:1. **Konfigurera Custom Domain** (valfritt)2. **Sätt upp SSL/TLS certifikat**3. **Implementera backup-strategi för databas**4. **Konfigurera alerting och monitoring**5. **Sätt upp staging environment**6. **Implementera blue-green deployment**---## 📚 Ytterligare resurser- [Azure Container Apps dokumentation](https://docs.microsoft.com/en-us/azure/container-apps/)- [Azure Developer CLI dokumentation](https://docs.microsoft.com/en-us/azure/developer/azure-developer-cli/)- [Azure PostgreSQL Flexible Server](https://docs.microsoft.com/en-us/azure/postgresql/flexible-server/)- [Azure Blob Storage med Managed Identity](https://docs.microsoft.com/en-us/azure/storage/blobs/storage-auth-aad-msi)**Senast uppdaterad:** 2025-06-05  **Nästa review:** 2026-06-05
+# 🚀 HSQ Forms API – Azure Deployment Guide
+
+Senast uppdaterad: 2025-08-07
+
+## 📋 Översikt
+
+Denna guide visar hur du deployar HSQ Forms API till Azure med en VNet-integrerad approach:
+
+- **Azure Container Apps** - för API hosting med autoscaling och VNet-integration
+- **Azure Database for PostgreSQL Flexible Server** - för databas
+- **Azure Blob Storage** - för filuppladdningar
+- **Azure Container Registry** - för Docker images
+- **Azure Log Analytics** - för monitorering och logging
+- **Azure Virtual Network** - för nätverkssäkerhet (obligatoriskt enligt policy)
+
+## 🏗️ Arkitektur
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Azure Resource Group                         │
+├─────────────────────────────────────────────────────────────────┤
+│  ┌─────────────────┐  ┌──────────────────┐  ┌─────────────────┐ │
+│  │   Container     │  │   PostgreSQL     │  │   Storage       │ │
+│  │     Apps        │  │   Flexible       │  │   Account       │ │
+│  │   Environment   │  │     Server       │  │                 │ │
+│  │                 │  │                  │  │  ┌───────────┐  │ │
+│  │  ┌───────────┐  │  │  Database:       │  │  │ Blob      │  │ │
+│  │  │ HSQ Forms │◄─┼──┼─► hsq_forms     │  │  │ Container │  │ │
+│  │  │    API    │  │  │                  │  │  │ uploads   │  │ │
+│  │  └─────┬─────┘  │  │                  │  │  └───────────┘  │ │
+│  │        │        │  │                  │  │                 │ │
+│  │  ┌─────▼─────┐  │  │                  │  │                 │ │
+│  │  │ Managed   │  │  │                  │  │                 │ │
+│  │  │ Identity  │──┼──┼──────────────────┼──┼─► Authentication│ │
+│  │  └───────────┘  │  │                  │  │                 │ │
+│  └─────────────────┘  └──────────────────┘  └─────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## 🛠️ Förutsättningar
+
+Innan du börjar, se till att du har:
+
+1. **Azure DevOps** konfigurerat med ditt projekt
+2. **Service Connection** till Azure i Azure DevOps
+3. **Git Repository** för projektet
+
+## 🚀 Deployment med Azure DevOps
+
+### Steg 1: Konfigurera Azure DevOps Pipeline
+
+1. Öppna ditt projekt i Azure DevOps
+2. Gå till Pipelines > Pipelines
+3. Skapa en ny pipeline eller redigera en befintlig
+4. Använd YAML-filen `azure-pipelines.yml` från ditt repository
+
+### Steg 2: Konfigurera pipeline-variabler
+
+Ställ in följande variabler i Azure DevOps:
+
+- `subscriptionId`: Azure-prenumerationens ID
+- `resourceGroupName`: Resursgruppens namn (t.ex. "rg-hsq-forms-dev")
+- `environment`: Miljönamn ("dev" eller "prod")
+- `projectName`: Projektets namn (t.ex. "hsq-forms")
+- `dbAdminPassword`: Lösenord för databasadministratör (som Secret)
+- `enableVNet`: Alltid "true" för att aktivera VNet-integration enligt Azure Policy
+
+### Steg 3: Säkerställ rätt behörigheter
+
+För att kunna deploya med VNet-integration krävs att Azure DevOps serviceprincipal har följande behörigheter:
+
+1. `Network Contributor` på resursgruppen
+2. `Microsoft.Network/virtualNetworks/*`
+3. `Microsoft.Network/virtualNetworks/subnets/*`
+
+Detta kan behöva konfigureras av en Azure-administratör genom att tilldela rätt roller till serviceprincipal.
+
+### Steg 4: Verifiera deployment
+
+När pipelinen är klar, kontrollera:
+
+1. Alla resurser har skapats i Azure Portal
+2. Container App är igång och fungerar
+3. API-endpoints är tillgängliga
+
+## 📊 Monitorering och logs
+
+### Azure Container Apps logs
+
+```bash
+# Visa live logs för API
+az containerapp logs show \
+  --resource-group rg-hsq-forms-dev \
+  --name hsq-forms-api-dev \
+  --follow
+```
+
+## 🛡️ Säkerhetskonfiguration
+
+### VNet-integration
+
+För ökad säkerhet, använd VNet-integration i produktionsmiljön:
+
+1. Ställ in `enableVNet=true` i pipeline-variablerna
+2. Se till att du har behörighet som Network Contributor
+
+## 🔄 Rekommenderad process
+
+1. **Utveckling**: Använd alltid VNet-integration enligt Azure Security Policy
+2. **Produktion**: Använd alltid VNet-integration för produktionsmiljön
+
+## 📝 Felsökning
+
+### Vanliga problem:
+
+1. **Namnkonflikter**: Azure-resursnamn måste vara globalt unika. Bicep-mallen genererar ett unikt suffix för att undvika konflikter.
+
+2. **VNet-behörigheter**: Om du får "AuthorizationFailed" för VNet-relaterade operationer, följ dessa steg:
+   - Kontrollera att serviceprincipal har rätt behörigheter (Network Contributor)
+   - Be Azure-administratör lägga till behörigheter för Microsoft.Network/virtualNetworks/* och Microsoft.Network/virtualNetworks/subnets/*
+   - Se till att serviceprincipal har dessa behörigheter på resursgruppsnivå
+
+3. **Container App åtkomst**: Container App är konfigurerad som intern (internal) enligt Azure Policy. För att komma åt API:et behöver du:
+   - Konfigurera VNet peering till ditt utvecklarnätverk
+   - Använda Azure Application Gateway eller Private Link
+   - Sätta upp en bastion-host inom samma VNet
+
+### Användbara kommandon:
+
+```bash
+# Lista resurser i resursgruppen
+az resource list --resource-group rg-hsq-forms-dev --output table
+
+# Validera Bicep-mall
+az deployment group validate --resource-group rg-hsq-forms-dev --template-file infra/main.bicep --parameters @infra/main.parameters.unified.json
+
+# Visa loggarna för Container App
+az containerapp logs show --resource-group rg-hsq-forms-dev --name hsq-forms-api-dev --follow
+```
+
+---
+
+## 📚 Ytterligare resurser
+
+- [Azure Container Apps dokumentation](https://docs.microsoft.com/en-us/azure/container-apps/)
+- [Bicep dokumentation](https://docs.microsoft.com/en-us/azure/azure-resource-manager/bicep/)
+- [Azure DevOps Pipelines](https://docs.microsoft.com/en-us/azure/devops/pipelines/)
+- [Azure PostgreSQL Flexible Server](https://docs.microsoft.com/en-us/azure/postgresql/flexible-server/)
+
+**Senast uppdaterad:** 2025-08-07  **Nästa review:** 2026-08-07

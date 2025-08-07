@@ -1,6 +1,5 @@
-// 🏗️ HSQ Forms API - Clean Azure Infrastructure
-// Skapar alla nödvändiga Azure-resurser för HSQ Forms API
-// Stöder både DEV och PROD miljöer
+// 🏗️ HSQ Forms API - Azure App Service Infrastructure
+// Skapar alla nödvändiga Azure-resurser för HSQ Forms API med App Service
 
 @description('Environment name (dev/prod)')
 param environmentName string = 'dev'
@@ -19,14 +18,11 @@ param dbAdminUsername string
 @secure()
 param dbAdminPassword string
 
-@description('Container app minimum replicas')
-param containerAppMinReplicas int = 1
-
-@description('Container app maximum replicas')
-param containerAppMaxReplicas int = 3
+@description('App Service Plan SKU')
+param appServiceSku string = 'B1'
 
 // Variables
-var resourceToken = toLower(uniqueString(subscription().id, resourceGroup().id, environmentName))
+var resourceToken = take(toLower(uniqueString(subscription().id, resourceGroup().id, environmentName)), 8)
 var tags = {
   Environment: environmentName
   Project: projectName
@@ -47,7 +43,6 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
     supportsHttpsTrafficOnly: true
     minimumTlsVersion: 'TLS1_2'
     allowBlobPublicAccess: false
-    publicNetworkAccess: 'Disabled'
     encryption: {
       services: {
         blob: {
@@ -154,22 +149,6 @@ resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09
   }
 }
 
-// 🏗️ Container Apps Environment
-resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2023-05-01' = {
-  name: '${projectName}-env-${environmentName}-${resourceToken}'
-  location: location
-  tags: tags
-  properties: {
-    appLogsConfiguration: {
-      destination: 'log-analytics'
-      logAnalyticsConfiguration: {
-        customerId: logAnalyticsWorkspace.properties.customerId
-        sharedKey: logAnalyticsWorkspace.listKeys().primarySharedKey
-      }
-    }
-  }
-}
-
 // 🔐 Managed Identity
 resource managedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
   name: '${projectName}-identity-${environmentName}-${resourceToken}'
@@ -177,8 +156,23 @@ resource managedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-
   tags: tags
 }
 
-// 🚀 Container App
-resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
+// 🏗️ App Service Plan
+resource appServicePlan 'Microsoft.Web/serverfarms@2022-09-01' = {
+  name: '${projectName}-plan-${environmentName}-${resourceToken}'
+  location: location
+  tags: tags
+  sku: {
+    name: appServiceSku
+  }
+  kind: 'linux'
+  properties: {
+    reserved: true  // Required for Linux
+    zoneRedundant: environmentName == 'prod' ? true : false
+  }
+}
+
+// 🚀 App Service (Web App)
+resource appService 'Microsoft.Web/sites@2022-09-01' = {
   name: '${projectName}-api-${environmentName}-${resourceToken}'
   location: location
   tags: union(tags, {
@@ -191,76 +185,90 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
     }
   }
   properties: {
-    managedEnvironmentId: containerAppsEnvironment.id
-    configuration: {
-      activeRevisionsMode: 'Single'
-      ingress: {
-        external: false  // Ingen extern åtkomst pga Azure Policy
-        targetPort: 8000
-        transport: 'http'
+    serverFarmId: appServicePlan.id
+    siteConfig: {
+      linuxFxVersion: 'PYTHON|3.11'  // FastAPI Python Runtime
+      alwaysOn: true
+      ftpsState: 'Disabled'
+      http20Enabled: true
+      minTlsVersion: '1.2'
+      cors: {
+        allowedOrigins: ['*']
       }
-      secrets: [
+      appSettings: [
         {
-          name: 'database-url'
+          name: 'WEBSITES_ENABLE_APP_SERVICE_STORAGE'
+          value: 'true'
+        }
+        {
+          name: 'SCM_DO_BUILD_DURING_DEPLOYMENT'
+          value: 'true'
+        }
+        {
+          name: 'SQLALCHEMY_DATABASE_URI'
           value: 'postgresql://${dbAdminUsername}:${dbAdminPassword}@${postgresServer.properties.fullyQualifiedDomainName}:5432/hsq_forms'
         }
         {
-          name: 'storage-account-key'
-          value: storageAccount.listKeys().keys[0].value
+          name: 'ENVIRONMENT'
+          value: environmentName
         }
-      ]
-    }
-    template: {
-      containers: [
         {
-          name: 'hsq-forms-api'
-          image: 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
-          env: [
-            {
-              name: 'APP_ENVIRONMENT'
-              value: environmentName
-            }
-            {
-              name: 'DATABASE_URL'
-              secretRef: 'database-url'
-            }
-            {
-              name: 'AZURE_STORAGE_ACCOUNT_NAME'
-              value: storageAccount.name
-            }
-            {
-              name: 'AZURE_STORAGE_CONTAINER_NAME'
-              value: 'form-uploads'
-            }
-            {
-              name: 'AZURE_STORAGE_TEMP_CONTAINER_NAME'
-              value: 'temp-uploads'
-            }
-            {
-              name: 'AZURE_CLIENT_ID'
-              value: managedIdentity.properties.clientId
-            }
-          ]
-          resources: {
-            cpu: json('0.5')
-            memory: '1Gi'
-          }
+          name: 'AZURE_STORAGE_ACCOUNT_NAME'
+          value: storageAccount.name
+        }
+        {
+          name: 'AZURE_STORAGE_CONTAINER_NAME'
+          value: 'form-uploads'
+        }
+        {
+          name: 'AZURE_STORAGE_TEMP_CONTAINER_NAME'
+          value: 'temp-uploads'
+        }
+        {
+          name: 'AZURE_CLIENT_ID'
+          value: managedIdentity.properties.clientId
+        }
+        {
+          name: 'PYTHON_ENABLE_GUNICORN_MULTIWORKERS'
+          value: 'true'
+        }
+        {
+          name: 'STARTUP_COMMAND'
+          value: 'gunicorn main:app --workers 2 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000'
         }
       ]
-      scale: {
-        minReplicas: containerAppMinReplicas
-        maxReplicas: containerAppMaxReplicas
-      }
     }
+  }
+}
+
+// 📈 Application Insights
+resource applicationInsights 'Microsoft.Insights/components@2020-02-02' = {
+  name: '${projectName}-insights-${environmentName}-${resourceToken}'
+  location: location
+  tags: tags
+  kind: 'web'
+  properties: {
+    Application_Type: 'web'
+    WorkspaceResourceId: logAnalyticsWorkspace.id
+  }
+}
+
+// Add Application Insights to Web App
+resource appServiceAppInsightsConfig 'Microsoft.Web/sites/config@2022-09-01' = {
+  parent: appService
+  name: 'appsettings'
+  properties: {
+    APPINSIGHTS_INSTRUMENTATIONKEY: applicationInsights.properties.InstrumentationKey
+    APPLICATIONINSIGHTS_CONNECTION_STRING: applicationInsights.properties.ConnectionString
+    ApplicationInsightsAgent_EXTENSION_VERSION: '~3'
   }
 }
 
 // 📤 Outputs
 output RESOURCE_GROUP_ID string = resourceGroup().id
-output AZURE_CONTAINER_APPS_ENVIRONMENT_ID string = containerAppsEnvironment.id
 output SERVICE_API_IDENTITY_PRINCIPAL_ID string = managedIdentity.properties.principalId
-output SERVICE_API_NAME string = containerApp.name
-output SERVICE_API_URI string = 'https://${containerApp.properties.configuration.ingress.fqdn}'
+output SERVICE_API_NAME string = appService.name
+output SERVICE_API_URI string = 'https://${appService.properties.defaultHostName}'
 output AZURE_STORAGE_ACCOUNT_NAME string = storageAccount.name
 output AZURE_STORAGE_BLOB_ENDPOINT string = storageAccount.properties.primaryEndpoints.blob
 
@@ -268,7 +276,7 @@ output AZURE_STORAGE_BLOB_ENDPOINT string = storageAccount.properties.primaryEnd
 output storageAccountName string = storageAccount.name
 output databaseHost string = postgresServer.properties.fullyQualifiedDomainName
 output databaseName string = postgresServer::database.name
-output containerAppUrl string = 'https://${containerApp.properties.configuration.ingress.fqdn}'
+output appServiceUrl string = 'https://${appService.properties.defaultHostName}'
 output managedIdentityPrincipalId string = managedIdentity.properties.principalId
 output managedIdentityClientId string = managedIdentity.properties.clientId
 output logAnalyticsWorkspaceId string = logAnalyticsWorkspace.id
