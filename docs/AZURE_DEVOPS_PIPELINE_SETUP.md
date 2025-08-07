@@ -28,20 +28,37 @@ Om du inte redan har en Service Connection för din Azure-prenumeration:
 
 > **OBS:** Om du vill använda ett annat namn på din Service Connection, behöver du även uppdatera namnet i pipeline-filen `azure-pipelines-dev.yml`.
 
-### 3. Skapa variable group i Azure DevOps
+### 3. Hantera databasuppgifterna
+
+Du har två alternativ för att hantera databasuppgifterna:
+
+#### Alternativ A: Skapa pipeline-variabler (enklast)
+
+När du skapar pipelinen i Azure DevOps:
+
+1. Klicka på **Variables** knappen under redigeringsläget (efter att du valt YAML-filen)
+2. Lägg till variablerna en i taget:
+   - Namn: `dbAdminUsername`, Värde: `hsqadmin`
+   - Namn: `dbAdminPassword`, Värde: `<generera ett starkt lösenord>`, Markera som **secret**
+3. Klicka på **Save**
+
+#### Alternativ B: Skapa variable group (rekommenderat för återanvändning)
+
+Om du planerar att återanvända dessa variabler i flera pipelines:
 
 1. Gå till **Pipelines** > **Library** i Azure DevOps
 2. Klicka på **+ Variable group**
 3. Ange namn: `hsq-forms-secrets`
-4. Lägg till följande variabler:
-   - `dbAdminUsername`: `hsqadmin` (du kan behålla detta standardanvändarnamn)
-   - `dbAdminPassword`: `<generera ett starkt lösenord>` (markera som Secret)
-   
-   > **Tips för lösenord**: Använd ett starkt lösenord (minst 8 tecken, inklusive stora och små bokstäver, siffror, och specialtecken). Du kan generera ett med kommandot:
-   > ```bash
-   > openssl rand -base64 16
-   > ```
-   > Eller använd Azures lösenordsgenerator i Azure Portal
+4. Klicka på **+ Add** för att lägga till variabler en i taget:
+   - Namn: `dbAdminUsername`, Värde: `hsqadmin`
+   - Namn: `dbAdminPassword`, Värde: `<generera ett starkt lösenord>`, Markera **Secret**-rutan
+5. Klicka på **Save**
+
+> **Tips för lösenord**: Använd ett starkt lösenord (minst 8 tecken, inklusive stora och små bokstäver, siffror, och specialtecken). Du kan generera ett med kommandot:
+> ```bash
+> openssl rand -base64 16
+> ```
+> Eller använd Azures lösenordsgenerator i Azure Portal
 
 ## Konfigurera pipeline
 
@@ -52,8 +69,11 @@ Om du inte redan har en Service Connection för din Azure-prenumeration:
 5. Välj **Existing Azure Pipelines YAML file**
 6. Välj `azure-pipelines-dev.yml` från listan
 7. Klicka på **Continue**
-8. Granska pipeline-konfigurationen
-9. Klicka på **Run**
+8. **Om du valde Alternativ A (pipeline-variabler)**: 
+   - Klicka på **Variables** knappen
+   - Lägg till variablerna som beskrivs ovan
+9. Granska pipeline-konfigurationen
+10. Klicka på **Run**
 
 ## Resurserna som skapas
 
