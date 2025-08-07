@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.37.4.10188",
-      "templateHash": "8016933115811533701"
+      "templateHash": "1410886581650398898"
     }
   },
   "parameters": {
@@ -165,10 +165,12 @@
       "location": "[parameters('location')]",
       "tags": "[variables('tags')]",
       "sku": {
-        "name": "Basic"
+        "name": "Premium"
       },
       "properties": {
-        "adminUserEnabled": true
+        "adminUserEnabled": true,
+        "publicNetworkAccess": "Disabled",
+        "networkRuleBypassOptions": "AzureServices"
       }
     },
     {
