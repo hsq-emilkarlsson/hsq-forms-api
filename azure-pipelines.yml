@@ -84,7 +84,7 @@ stages:
           echo "🌍 Location: West Europe"
         
     - task: AzureResourceManagerTemplateDeployment@3
-      displayName: 'Deploy Bicep Template'
+      displayName: 'Deploy Bicep Template (IT-Approved AVM Modules)'
       inputs:
         deploymentScope: 'Resource Group'
         azureResourceManagerConnection: 'SCON-HAZE-01AA-APP1066-Dev-Martechlab'
@@ -93,8 +93,8 @@ stages:
         resourceGroupName: '$(resourceGroupName)'
         location: 'West Europe'
         templateLocation: 'Linked artifact'
-        csmFile: 'infra/main-ready.bicep'
-        csmParametersFile: 'infra/main-ready.parameters.dev.json'
+        csmFile: 'infra/main-avm.bicep'
+        csmParametersFile: 'infra/main-avm.parameters.dev.json'
         overrideParameters: ''
         deploymentMode: 'Incremental'
         deploymentName: 'hsq-forms-$(environment)-$(Build.BuildNumber)'

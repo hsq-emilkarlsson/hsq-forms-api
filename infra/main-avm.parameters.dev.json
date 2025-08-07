@@ -1,0 +1,24 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "environmentName": {
+      "value": "dev"
+    },
+    "projectName": {
+      "value": "hsq-forms"
+    },
+    "dbAdminUsername": {
+      "value": "hsq_admin"
+    },
+    "dbAdminPassword": {
+      "value": "TempPassword123!"
+    },
+    "containerAppMinReplicas": {
+      "value": 1
+    },
+    "containerAppMaxReplicas": {
+      "value": 3
+    }
+  }
+}

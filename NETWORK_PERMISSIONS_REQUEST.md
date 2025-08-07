@@ -2,18 +2,33 @@
 
 ## 🎯 Sammanfattning
 **Projekt:** HSQ Forms API Deployment  
-**Status:** ✅ Policy-compliant template redo - Endast Network permissions krävs  
-**Lösning:** Utökade Azure permissions krävs för VNet-baserad deployment
+**Status:** ✅ Uses IT-approved Azure Verified Modules - Only Network permissions needed  
+**Solution:** Upgraded to official Azure modules following IT guidance
 
 ---
 
-## ✅ **PROBLEM LÖST - TEKNISK UPPDATERING**
+## ✅ **PROBLEM LÖST - IT-APPROVED MODULES IMPLEMENTED**
 
-### ✅ Container App Policy Compliance:
-- **Fixed:** Pipeline nu använder `infra/main-ready.bicep` 
-- **Fixed:** Container App har `ingressExternal: false` (privat endpoint)
-- **Fixed:** Container Apps Environment är `internal: true`
-- **Ready:** All kod följer Azure Policy requirements
+### ✅ Official Azure Verified Modules (AVM):
+- **Updated:** Pipeline använder `br/public:avm/res/app/container-app:0.17.0`
+- **Follows:** IT-link: https://github.com/Azure/bicep-registry-modules/tree/main/avm/res/app/container-app#example-4-vnet-integrated-container-app-deployment
+- **Configuration:** Exakt enligt IT:s exempel med `ingressExternal: false`
+- **Standards:** Follows Azure Well-Architected Framework
+
+### ✅ IT-Approved Configuration Confirmed:
+```bicep
+// infra/main-avm.bicep - Uses official Azure modules
+module containerApp 'br/public:avm/res/app/container-app:0.17.0' = {
+  params: {
+    ingressExternal: false    // ✅ IT's exact requirement
+    additionalPortMappings: [
+      {
+        external: false       // ✅ All ports private
+      }
+    ]
+  }
+}
+```
 
 ### Network permissions behövs fortfarande:
 ```
