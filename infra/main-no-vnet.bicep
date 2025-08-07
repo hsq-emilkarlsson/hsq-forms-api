@@ -149,7 +149,7 @@ resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2023-05-01'
         sharedKey: logAnalyticsWorkspace.listKeys().primarySharedKey
       }
     }
-    publicNetworkAccess: 'Disabled' // 🔒 Policy compliant!
+    // ✅ REMOVED: publicNetworkAccess - does not belong here
   }
 }
 

@@ -84,7 +84,7 @@ stages:
           echo "🌍 Location: West Europe"
         
     - task: AzureResourceManagerTemplateDeployment@3
-      displayName: 'Deploy Bicep Template (IT-Approved AVM Modules)'
+      displayName: 'Deploy Bicep Template (Minimal VNet for Policy Compliance)'
       inputs:
         deploymentScope: 'Resource Group'
         azureResourceManagerConnection: 'SCON-HAZE-01AA-APP1066-Dev-Martechlab'
@@ -93,11 +93,11 @@ stages:
         resourceGroupName: '$(resourceGroupName)'
         location: 'West Europe'
         templateLocation: 'Linked artifact'
-        csmFile: 'infra/main-no-vnet.bicep'  # 🧪 TEST: NO-VNet approach
-        csmParametersFile: 'infra/main-no-vnet.parameters.dev.json'
+        csmFile: 'infra/main-minimal-vnet.bicep'  # 🔬 ATTEMPT: Minimal VNet with required permissions
+        csmParametersFile: 'infra/main-minimal-vnet.parameters.dev.json'
         overrideParameters: ''
         deploymentMode: 'Incremental'
-        deploymentName: 'hsq-forms-no-vnet-$(environment)-$(Build.BuildNumber)'
+        deploymentName: 'hsq-forms-minimal-vnet-$(environment)-$(Build.BuildNumber)'
         
     - task: AzureCLI@2
       displayName: 'List Deployed Resources'
