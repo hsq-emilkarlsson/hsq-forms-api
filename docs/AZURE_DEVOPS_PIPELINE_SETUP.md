@@ -81,26 +81,36 @@ När pipelinen körs skapas följande resurser i Azure:
 
 | Resurstyp | Namnmönster | Beskrivning |
 |-----------|-------------|-------------|
+| Virtual Network | `hsq-forms-vnet-dev-[token]` | VNet med tre subnät |
 | App Service Plan | `hsq-forms-plan-dev-[token]` | B1 App Service Plan |
-| App Service | `hsq-forms-api-dev-[token]` | Python 3.11 web app |
-| PostgreSQL Flexible Server | `hsq-forms-dev-[token]` | Standard_B1ms |
+| App Service | `hsq-forms-api-dev-[token]` | Python 3.11 web app med VNet-integration |
+| PostgreSQL Flexible Server | `hsq-forms-dev-[token]` | Standard_B1ms med VNet-integration |
 | PostgreSQL Database | `hsq_forms` | Databas på PostgreSQL-servern |
-| Storage Account | `hsqformsdev[token]` | För att lagra formulärbilagor |
+| Storage Account | `hsqformsdev[token]` | För att lagra formulärbilagor med Private Endpoint |
+| Private DNS Zones | - | För PostgreSQL och Storage |
+| Private Endpoints | - | För säker kommunikation inom VNet |
 | Log Analytics Workspace | `hsq-forms-logs-dev-[token]` | För loggning |
 | Application Insights | `hsq-forms-insights-dev-[token]` | För övervakning |
 | Managed Identity | `hsq-forms-identity-dev-[token]` | För autentisering |
 
 Där `[token]` är en unik identifierare som genereras baserat på din prenumeration, resursgrupp och miljö.
 
+> **OBS:** På grund av företagets Azure Policy-krav (`deny-paas-public-dev`) konfigureras alla resurser med privat nätverksåtkomst. Detta innebär att resurserna endast är tillgängliga från inom det VNet som skapas.
+
 ## Verifiera deployment
 
 När pipelinen har körts klart kan du verifiera att allt fungerar korrekt:
 
 1. Gå till Azure Portal och öppna resursgruppen `rg-hsq-forms-dev`
-2. Hitta App Service och klicka på URL:en för att öppna applikationen
-3. Navigera till `/docs` för att se API-dokumentationen
+2. Kontrollera att alla resurser har skapats korrekt, särskilt VNet, Private Endpoints och App Service
 
-Du kan också använda testskriptet:
+> **OBS:** På grund av privat nätverksåtkomst kommer du inte att kunna öppna applikationen direkt från internet. För att testa applikationen behöver du:
+>
+> 1. Skapa en Jump Host (VM) i samma VNet
+> 2. Konfigurera VPN-åtkomst till VNet-et
+> 3. Använd Azure Bastion för att ansluta till en VM i samma VNet
+
+Du kan verifiera deployment status med testskriptet (om det körs från en maskin med VNet-åtkomst):
 
 ```bash
 ./scripts/test-appservice-deployment.sh rg-hsq-forms-dev hsq-forms-api-dev-[token] dev
@@ -125,10 +135,23 @@ Dina angivna databas-credentials används för:
 
 Om du stöter på problem under deployment:
 
-1. Kontrollera pipeline-loggar i Azure DevOps
-2. Kontrollera App Service-loggar i Azure Portal
-3. Verifiera att alla miljövariabler är korrekt konfigurerade
-4. Kontrollera att Service Connection har rätt behörigheter
+1. **Policy-relaterade problem**:
+   - Felmeddelanden om "PolicyViolation" indikerar konflikter med företagets Azure Policies
+   - Vi använder en VNet-integrerad mall i `main-appservice.bicep` för att hantera policy-kraven
+   - Om du fortfarande får policy-fel, kontakta din Azure-administratör för undantag
+
+2. **VNet-relaterade problem**:
+   - Kontrollera att resurserna har korrekt VNet-konfiguration
+   - Verifiera att Private Endpoints är korrekt uppsatta
+   - DNS-upplösning kan behöva konfigureras korrekt
+
+3. **Allmän felsökning**:
+   - Kontrollera pipeline-loggar i Azure DevOps
+   - Kontrollera resursloggarna i Azure Portal
+   - Verifiera att alla miljövariabler är korrekt konfigurerade
+   - Kontrollera att Service Connection har rätt behörigheter
+
+> **OBS:** Deployment med VNet-integration tar längre tid (15-20 minuter) jämfört med standard-deployment.
 
 ## Nästa steg
 
