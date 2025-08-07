@@ -107,16 +107,18 @@ resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2023-03-01-pr
   }
 }
 
-// 🔧 Container Registry
+// 🔧 Container Registry (Policy Compliant)
 resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
   name: 'hsq${environmentName}acr${shortToken}'
   location: location
   tags: tags
   sku: {
-    name: 'Basic'
+    name: 'Premium'  // ✅ Premium required for publicNetworkAccess setting
   }
   properties: {
     adminUserEnabled: true
+    publicNetworkAccess: 'Disabled'  // ✅ Policy compliant
+    networkRuleBypassOptions: 'AzureServices'  // Allow Azure services
   }
 }
 
