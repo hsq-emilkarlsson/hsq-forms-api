@@ -137,7 +137,7 @@ Om du stöter på problem under deployment:
 
 1. **Policy-relaterade problem**:
    - Felmeddelanden om "PolicyViolation" indikerar konflikter med företagets Azure Policies
-   - Vi använder en VNet-integrerad mall i `main-appservice.bicep` för att hantera policy-kraven
+   - Vi använder en VNet-integrerad mall i `infra/bicep/main.bicep` för att hantera policy-kraven
    - Om du fortfarande får policy-fel, kontakta din Azure-administratör för undantag
 
 2. **VNet-relaterade problem**:

@@ -90,8 +90,8 @@ stages:
         resourceGroupName: '$(resourceGroupName)'
         location: '$(location)'
         templateLocation: 'Linked artifact'
-        csmFile: 'infra/main-appservice.bicep'
-        csmParametersFile: 'infra/main-appservice.parameters.json'
+        csmFile: 'infra/bicep/main.bicep'
+        csmParametersFile: 'infra/bicep/main.parameters.json'
         overrideParameters: >-
           -environmentName $(environment)
           -projectName $(projectName)
