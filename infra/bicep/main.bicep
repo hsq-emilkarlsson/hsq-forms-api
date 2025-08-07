@@ -203,7 +203,6 @@ resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2022-12-01' =
       mode: 'Disabled'
     }
     createMode: 'Default'
-    publicNetworkAccess: 'Disabled'
   }
 
   // Create the database
@@ -274,7 +273,7 @@ resource postgresDnsZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZone
 
 // Private DNS Zone for Blob Storage
 resource storageDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = {
-  name: 'privatelink.blob.core.windows.net'
+  name: 'privatelink.blob.${environment().suffixes.storage}'
   location: 'global'
   tags: tags
 }
@@ -387,7 +386,6 @@ resource appService 'Microsoft.Web/sites@2022-09-01' = {
       ]
     }
     virtualNetworkSubnetId: vnet.properties.subnets[0].id
-    publicNetworkAccess: 'Enabled' // Required for deployment but later set to 'Disabled'
   }
 }
 
@@ -399,27 +397,6 @@ resource appServiceVNetConfig 'Microsoft.Web/sites/networkConfig@2022-09-01' = {
     subnetResourceId: vnet.properties.subnets[0].id
     swiftSupported: true
   }
-}
-
-// Configure App Service with Private Endpoints after VNet integration is set up
-resource updateAppServiceAccess 'Microsoft.Web/sites@2022-09-01' = {
-  name: appService.name
-  location: location
-  tags: tags
-  identity: {
-    type: 'UserAssigned'
-    userAssignedIdentities: {
-      '${managedIdentity.id}': {}
-    }
-  }
-  properties: {
-    serverFarmId: appServicePlan.id
-    publicNetworkAccess: 'Disabled'
-    virtualNetworkSubnetId: vnet.properties.subnets[0].id
-  }
-  dependsOn: [
-    appServiceVNetConfig
-  ]
 }
 
 // 📈 Application Insights
