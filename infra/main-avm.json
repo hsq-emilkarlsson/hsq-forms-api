@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.37.4.10188",
-      "templateHash": "17060439729061641256"
+      "templateHash": "15145959350456234759"
     }
   },
   "parameters": {
@@ -59,6 +59,7 @@
   },
   "variables": {
     "resourceToken": "[toLower(uniqueString(subscription().id, resourceGroup().id, parameters('environmentName')))]",
+    "shortToken": "[substring(variables('resourceToken'), 0, 8)]",
     "tags": {
       "Environment": "[parameters('environmentName')]",
       "Project": "[parameters('projectName')]",
@@ -1732,7 +1733,7 @@
         "mode": "Incremental",
         "parameters": {
           "name": {
-            "value": "[format('{0}{1}{2}', parameters('projectName'), parameters('environmentName'), variables('resourceToken'))]"
+            "value": "[format('hsq{0}st{1}', parameters('environmentName'), variables('shortToken'))]"
           },
           "location": {
             "value": "[parameters('location')]"
@@ -9615,7 +9616,7 @@
         "mode": "Incremental",
         "parameters": {
           "name": {
-            "value": "[format('{0}{1}acr{2}', parameters('projectName'), parameters('environmentName'), variables('resourceToken'))]"
+            "value": "[format('hsq{0}acr{1}', parameters('environmentName'), variables('shortToken'))]"
           },
           "location": {
             "value": "[parameters('location')]"

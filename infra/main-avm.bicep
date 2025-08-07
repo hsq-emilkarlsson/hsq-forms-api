@@ -25,6 +25,7 @@ param containerAppMaxReplicas int = 3
 
 // Variables
 var resourceToken = toLower(uniqueString(subscription().id, resourceGroup().id, environmentName))
+var shortToken = substring(resourceToken, 0, 8)  // ✅ Shorter token for name length limits
 var tags = {
   Environment: environmentName
   Project: projectName
@@ -54,7 +55,7 @@ module vnet 'br/public:avm/res/network/virtual-network:0.7.0' = {
 module storageAccount 'br/public:avm/res/storage/storage-account:0.15.0' = {
   name: '${uniqueString(deployment().name, location)}-storage'
   params: {
-    name: '${projectName}${environmentName}${resourceToken}'
+    name: 'hsq${environmentName}st${shortToken}'  // ✅ Shortened name < 24 chars
     location: location
     tags: tags
     kind: 'StorageV2'
@@ -105,7 +106,7 @@ module postgresServer 'br/public:avm/res/db-for-postgre-sql/flexible-server:0.6.
 module containerRegistry 'br/public:avm/res/container-registry/registry:0.6.0' = {
   name: '${uniqueString(deployment().name, location)}-acr'
   params: {
-    name: '${projectName}${environmentName}acr${resourceToken}'
+    name: 'hsq${environmentName}acr${shortToken}'  // ✅ Shortened name < 24 chars
     location: location
     tags: tags
     acrSku: 'Basic'  // ✅ Fixed: acrSku instead of skuName
