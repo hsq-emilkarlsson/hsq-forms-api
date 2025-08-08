@@ -1,5 +1,6 @@
 fastapi==0.100.0
 uvicorn==0.23.2
+gunicorn==21.2.0  # För produktion med workers
 python-dotenv==1.0.0
 pydantic[email]==2.5.0
 pydantic-settings==2.1.0
@@ -15,11 +16,19 @@ python-magic==0.4.27
 python-magic-bin==0.4.14  # För Windows och Linux-stöd
 aiohttp==3.12.7  # Required for async Azure Storage operations
 
+# API-specifika
 jsonschema==4.21.1
 httpx==0.25.2  # Required for async HTTP requests (webhooks)
+requests==2.31.0  # Required for synchronous HTTP requests
+email-validator==2.1.0  # Required for email validation
 
 # För testning
 pytest==7.4.3
 pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+pytest-env==0.8.2  # För att sätta miljövariabler i tester
+freezegun==1.2.2  # För tids-beroende tester
+
+# Säkerhet och rate limiting
 slowapi==0.1.9  # Rate limiting middleware
 redis==5.0.1  # Redis backend for rate limiting (optional)
