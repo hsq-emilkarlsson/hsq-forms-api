@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "environmentName": {
+      "value": "dev"
+    },
+    "location": {
+      "value": "West Europe"
+    },
+    "projectName": {
+      "value": "hsq-forms"
+    },
+    "dbAdminUsername": {
+      "value": "hsqadmin"
+    },
+    "dbAdminPassword": {
+      "value": "YourSecurePassword123!"
+    },
+    "frontendOrigins": {
+      "value": [
+        "http://localhost:3000",
+        "http://localhost:5173"
+      ]
+    },
+    "containerAppScale": {
+      "value": {
+        "minReplicas": 1,
+        "maxReplicas": 3
+      }
+    }
+  }
+}

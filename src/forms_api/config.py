@@ -11,7 +11,7 @@ import logging
 from functools import lru_cache
 from typing import Dict, List, Optional, Union
 
-from pydantic import AnyHttpUrl, ConfigDict, field_validator
+from pydantic import AnyHttpUrl, ConfigDict, field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 logger = logging.getLogger(__name__)
@@ -121,8 +121,23 @@ class Settings(BaseSettings):
     azure_storage_account_name: Optional[str] = None
     azure_storage_account_key: Optional[str] = None
     azure_storage_connection_string: Optional[str] = None
-    azure_storage_container_name: str = "form-attachments"
+    azure_storage_container_name: str = "form-uploads"
+    azure_storage_temp_container_name: str = "temp-uploads"
+    azure_client_id: Optional[str] = None
     azure_blob_expiry_days: int = 30
+    
+    # Automatically use Azure Storage when running in App Service
+    @model_validator(mode='after')
+    def auto_configure_azure_storage(self) -> 'Settings':
+        """Auto-configure Azure Storage when running in App Service"""
+        # Detect Azure App Service environment
+        if os.getenv("AZURE_STORAGE_ACCOUNT_NAME") and os.getenv("AZURE_CLIENT_ID"):
+            self.storage_type = "azure"
+            self.azure_storage_account_name = os.getenv("AZURE_STORAGE_ACCOUNT_NAME")
+            self.azure_storage_container_name = os.getenv("AZURE_STORAGE_CONTAINER_NAME", "form-uploads")
+            self.azure_storage_temp_container_name = os.getenv("AZURE_STORAGE_TEMP_CONTAINER_NAME", "temp-uploads")
+            self.azure_client_id = os.getenv("AZURE_CLIENT_ID")
+        return self
     
     # Security settings
     secret_key: str = "development_secret_key"

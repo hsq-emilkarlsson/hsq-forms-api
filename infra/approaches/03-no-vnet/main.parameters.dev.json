@@ -1,0 +1,24 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "environmentName": {
+      "value": "dev"
+    },
+    "location": {
+      "value": "West Europe"
+    },
+    "dbAdminUsername": {
+      "value": "hsqadmin"
+    },
+    "dbAdminPassword": {
+      "value": "TempPassword123!"
+    },
+    "containerAppMinReplicas": {
+      "value": 1
+    },
+    "containerAppMaxReplicas": {
+      "value": 3
+    }
+  }
+}

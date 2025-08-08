@@ -1,10 +1,10 @@
-# 🚀 HSQ Forms API - Azure DevOps Pipeline (Development)
+# 🚀 HSQ Forms API - Azure DevOps Pipeline
 # Pipeline för att bygga, testa och deploya HSQ Forms API på Azure App Service
-# Denna pipeline är för utvecklingsmiljön
 
 trigger:
   branches:
     include:
+      - main
       - develop
   paths:
     include:
@@ -13,17 +13,27 @@ trigger:
       - main.py
       - requirements.txt
       - alembic/**
-      - azure-pipelines-dev.yml
+      - azure-pipelines.yml
 
 variables:
-  # Environment settings
-  environment: 'dev'
+  # Common settings
   projectName: 'hsq-forms'
   location: 'westeurope'
   pythonVersion: '3.11'
-  subscriptionId: 'c0b03b12-570f-4442-b337-c9175ad4037f'
-  resourceGroupName: 'rg-hsq-forms-dev'
-  appServiceSku: 'B1'
+  
+  # Environment specific settings
+  ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/main') }}:
+    environment: 'prod'
+    subscriptionId: 'c0b03b12-570f-4442-b337-c9175ad4037f'
+    resourceGroupName: 'rg-hsq-forms-prod'
+    appServiceName: 'hsq-forms-prod-app'
+    appServiceSku: 'P1V2'
+  ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/develop') }}:
+    environment: 'dev'
+    subscriptionId: 'c0b03b12-570f-4442-b337-c9175ad4037f'
+    resourceGroupName: 'rg-hsq-forms-dev'
+    appServiceName: 'hsq-forms-dev-app'
+    appServiceSku: 'B1'
 
 stages:
 - stage: Test
@@ -37,7 +47,7 @@ stages:
     - task: UsePythonVersion@0
       inputs:
         versionSpec: '$(pythonVersion)'
-      displayName: 'Use Python $(pythonVersion)'
+        displayName: 'Use Python $(pythonVersion)'
     
     - script: |
         python -m pip install --upgrade pip
@@ -73,8 +83,8 @@ stages:
         resourceGroupName: '$(resourceGroupName)'
         location: '$(location)'
         templateLocation: 'Linked artifact'
-        csmFile: 'infra/bicep/main.bicep'
-        csmParametersFile: 'infra/bicep/main.parameters.json'
+        csmFile: 'infra/main-appservice.bicep'
+        csmParametersFile: 'infra/main-appservice.parameters.json'
         overrideParameters: >-
           -environmentName $(environment)
           -projectName $(projectName)
@@ -110,13 +120,13 @@ stages:
     - task: UsePythonVersion@0
       inputs:
         versionSpec: '$(pythonVersion)'
-      displayName: 'Use Python $(pythonVersion)'
+        displayName: 'Use Python $(pythonVersion)'
     
     - script: |
         # Create deployment package
         echo "📦 Creating deployment package..."
         mkdir -p $(Build.ArtifactStagingDirectory)/app
-        cp -r src/ main.py alembic/ alembic.ini requirements.txt scripts/ $(Build.ArtifactStagingDirectory)/app/
+        cp -r src/ main.py alembic/ alembic.ini requirements.txt $(Build.ArtifactStagingDirectory)/app/
         cd $(Build.ArtifactStagingDirectory)
         zip -r app.zip app/
       displayName: 'Prepare Deployment Package'
@@ -126,7 +136,7 @@ stages:
       inputs:
         azureSubscription: 'SCON-HAZE-01AA-APP1066-Dev-Martechlab'
         appType: 'webAppLinux'
-        appName: 'hsq-forms-api-dev'
+        appName: '$(appServiceName)'
         package: '$(Build.ArtifactStagingDirectory)/app.zip'
         runtimeStack: 'PYTHON|3.11'
         startUpCommand: 'gunicorn main:app --workers 2 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000'
@@ -138,58 +148,13 @@ stages:
         scriptType: 'bash'
         scriptLocation: 'inlineScript'
         inlineScript: |
-          # Get App Service name with wildcard pattern
-          echo "🔍 Finding App Service..."
-          APP_SERVICE_NAME="hsq-forms-api-dev"
-          
-          echo "🔎 Found App Service: $APP_SERVICE_NAME"
-          
           # Get connection string from App Service settings
-          echo "🔄 Running database migrations..."
-          CONNECTION_STRING=$(az webapp config appsettings list --name "$APP_SERVICE_NAME" --resource-group $(resourceGroupName) --query "[?name=='SQLALCHEMY_DATABASE_URI'].value" -o tsv)
+          echo "� Running database migrations..."
+          CONNECTION_STRING=$(az webapp config appsettings list --name $(appServiceName) --resource-group $(resourceGroupName) --query "[?name=='SQLALCHEMY_DATABASE_URI'].value" -o tsv)
           
           # Run migrations
           pip install -r requirements.txt
           export SQLALCHEMY_DATABASE_URI="$CONNECTION_STRING"
           python -m alembic upgrade head
           
-          echo "✅ Deployment successful! Application available at: https://$APP_SERVICE_NAME.azurewebsites.net/"
-
-    - task: AzureCLI@2
-      displayName: 'Verify Azure Connections'
-      inputs:
-        azureSubscription: 'SCON-HAZE-01AA-APP1066-Dev-Martechlab'
-        scriptType: 'bash'
-        scriptLocation: 'inlineScript'
-        inlineScript: |
-          # Hämta App Service namn
-          APP_SERVICE_NAME="hsq-forms-api-dev"
-          echo "🔍 Hittade App Service: $APP_SERVICE_NAME"
-          
-          # Hämta App Service-inställningar
-          echo "📋 Hämtar App Service-inställningar..."
-          DB_URI=$(az webapp config appsettings list --name "$APP_SERVICE_NAME" --resource-group $(resourceGroupName) --query "[?name=='SQLALCHEMY_DATABASE_URI'].value" -o tsv)
-          STORAGE_ACCOUNT=$(az webapp config appsettings list --name "$APP_SERVICE_NAME" --resource-group $(resourceGroupName) --query "[?name=='AZURE_STORAGE_ACCOUNT_NAME'].value" -o tsv)
-          CLIENT_ID=$(az webapp config appsettings list --name "$APP_SERVICE_NAME" --resource-group $(resourceGroupName) --query "[?name=='AZURE_CLIENT_ID'].value" -o tsv)
-          
-          # Sätt miljövariabler för testskriptet
-          export SQLALCHEMY_DATABASE_URI="$DB_URI"
-          export AZURE_STORAGE_ACCOUNT_NAME="$STORAGE_ACCOUNT"
-          export AZURE_CLIENT_ID="$CLIENT_ID"
-          export AZURE_STORAGE_CONTAINER_NAME="form-uploads"
-          export AZURE_STORAGE_TEMP_CONTAINER_NAME="temp-uploads"
-          
-          # Installera beroenden
-          pip install -r requirements.txt
-          
-          # Kör verifieringsskript
-          echo "🧪 Kör Azure-anslutningstester..."
-          python $(Build.ArtifactStagingDirectory)/app/scripts/test-azure-connection.py
-          
-          # Kontrollera att testerna lyckades
-          if [ $? -ne 0 ]; then
-            echo "❌ Azure-anslutningstester misslyckades!"
-            exit 1
-          else
-            echo "✅ Azure-anslutningstester genomförda framgångsrikt!"
-          fi
+          echo "✅ Deployment successful! Application available at: https://$(appServiceName).azurewebsites.net/"

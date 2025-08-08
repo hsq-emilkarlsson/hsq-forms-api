@@ -1,0 +1,158 @@
+# 🚀 HSQ Forms API - Simplified Azure DevOps Pipeline
+# En enkel pipeline för att bygga, testa och deploya HSQ Forms API
+
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+  paths:
+    include:
+      - src/**
+      - infra/**
+      - Dockerfile
+      - Dockerfile.prod
+      - requirements.txt
+      - azure-pipelines-simplified.yml
+
+variables:
+  # Docker and Container settings
+  imageRepository: 'hsq-forms-api'
+  tag: '$(Build.BuildId)'
+  
+  # Environment specific settings
+  ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/main') }}:
+    acrName: 'hsqformsprodacr'
+    environment: 'prod'
+    subscriptionId: 'c0b03b12-570f-4442-b337-c9175ad4037f'
+    resourceGroupName: 'rg-hsq-forms-prod'
+    containerAppName: 'hsq-forms-api-prod'
+    dockerfilePath: 'Dockerfile.prod'
+    enableVNet: true
+  ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/develop') }}:
+    acrName: 'hsqformsdevacr'
+    environment: 'dev'
+    subscriptionId: 'c0b03b12-570f-4442-b337-c9175ad4037f'
+    resourceGroupName: 'rg-hsq-forms-dev'
+    containerAppName: 'hsq-forms-api-dev'
+    dockerfilePath: 'Dockerfile'
+    enableVNet: false
+
+stages:
+- stage: Test
+  displayName: 'Test Application'
+  jobs:
+  - job: TestCode
+    displayName: 'Run Tests'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - task: UsePythonVersion@0
+      inputs:
+        versionSpec: '3.11'
+        displayName: 'Use Python 3.11'
+    
+    - script: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-dev.txt
+      displayName: 'Install dependencies'
+    
+    - script: |
+        export SKIP_API_TESTS=true
+        python -m pytest tests/ -v --tb=short
+      displayName: 'Run tests'
+      continueOnError: false
+
+- stage: Infrastructure
+  displayName: 'Deploy Infrastructure'
+  dependsOn: Test
+  condition: succeeded()
+  jobs:
+  - job: DeployInfrastructure
+    displayName: 'Deploy Azure Resources'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - checkout: self
+    
+    - task: AzureResourceManagerTemplateDeployment@3
+      displayName: 'Deploy Bicep Template'
+      inputs:
+        deploymentScope: 'Resource Group'
+        azureResourceManagerConnection: 'SCON-HAZE-01AA-APP1066-Dev-Martechlab'
+        subscriptionId: '$(subscriptionId)'
+        action: 'Create Or Update Resource Group'
+        resourceGroupName: '$(resourceGroupName)'
+        location: 'West Europe'
+        templateLocation: 'Linked artifact'
+        csmFile: 'infra/main.bicep'
+        csmParametersFile: 'infra/main.parameters.unified.json'
+        overrideParameters: >-
+          -environmentName $(environment)
+          -projectName $(projectName)
+          -dbAdminUsername $(dbAdminUsername)
+          -dbAdminPassword $(dbAdminPassword)
+          -enableVNet $(enableVNet)
+        deploymentMode: 'Incremental'
+        deploymentName: 'hsq-forms-$(environment)-$(Build.BuildNumber)'
+    
+    - task: AzureCLI@2
+      displayName: 'List Deployed Resources'
+      inputs:
+        azureSubscription: 'SCON-HAZE-01AA-APP1066-Dev-Martechlab'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          echo "✅ Infrastructure deployment completed"
+          echo "📋 Checking deployed resources..."
+          az resource list --resource-group $(resourceGroupName) --output table
+
+- stage: BuildAndDeploy
+  displayName: 'Build & Deploy App'
+  dependsOn: Infrastructure
+  condition: succeeded()
+  jobs:
+  - job: BuildAndPushImage
+    displayName: 'Build & Push Docker Image'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - checkout: self
+    
+    - task: Docker@2
+      displayName: 'Build and push Docker image'
+      inputs:
+        containerRegistry: 'Azure Container Registry'
+        repository: '$(imageRepository)-$(environment)'
+        command: 'buildAndPush'
+        Dockerfile: '$(dockerfilePath)'
+        buildContext: '.'
+        tags: |
+          $(tag)
+          latest
+        arguments: '--build-arg ENVIRONMENT=$(environment)'
+    
+    - task: AzureCLI@2
+      displayName: 'Deploy to Container App'
+      inputs:
+        azureSubscription: 'SCON-HAZE-01AA-APP1066-Dev-Martechlab'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          # Get ACR credentials
+          ACR_USERNAME=$(az acr credential show --name $(acrName) --query username -o tsv)
+          ACR_PASSWORD=$(az acr credential show --name $(acrName) --query "passwords[0].value" -o tsv)
+          
+          # Deploy to Container App
+          echo "🚀 Deploying $(acrName).azurecr.io/$(imageRepository)-$(environment):latest to $(containerAppName)"
+          az containerapp update \
+            --name $(containerAppName) \
+            --resource-group $(resourceGroupName) \
+            --image $(acrName).azurecr.io/$(imageRepository)-$(environment):latest \
+            --registry-username $ACR_USERNAME \
+            --registry-password $ACR_PASSWORD
+          
+          # Get the Container App URL
+          APP_URL=$(az containerapp show --name $(containerAppName) --resource-group $(resourceGroupName) --query properties.configuration.ingress.fqdn -o tsv)
+          echo "✅ Deployment successful! Application available at: https://$APP_URL"

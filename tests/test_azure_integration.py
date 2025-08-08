@@ -7,6 +7,7 @@ import asyncio
 import os
 import tempfile
 import logging
+import pytest
 from fastapi import UploadFile
 from pathlib import Path
 
@@ -28,6 +29,66 @@ async def test_azure_storage():
         "FORCE_AZURE_STORAGE": "false"  # Använd lokal storage för test
     }
     
+@pytest.mark.skipif(not os.getenv("AZURE_STORAGE_ACCOUNT_NAME"), reason="Kräver Azure Storage konfiguration")
+def test_live_azure_storage_connection():
+    """Test för att verifiera anslutning till Azure Storage med Managed Identity."""
+    try:
+        from azure.identity import DefaultAzureCredential
+        from azure.storage.blob import BlobServiceClient
+    except ImportError:
+        pytest.skip("azure-storage-blob och azure-identity moduler behövs för detta test")
+    
+    # Hämta inställningar från miljövariabler
+    account_name = os.getenv("AZURE_STORAGE_ACCOUNT_NAME")
+    assert account_name, "AZURE_STORAGE_ACCOUNT_NAME måste vara inställd"
+    
+    # Skapa anslutning med DefaultAzureCredential (hanterar Managed Identity automatiskt)
+    account_url = f"https://{account_name}.blob.core.windows.net"
+    credential = DefaultAzureCredential()
+    
+    # Försök att ansluta till blob service
+    blob_service_client = BlobServiceClient(account_url=account_url, credential=credential)
+    
+    # Kontrollera containers
+    containers = list(blob_service_client.list_containers(max_results=10))
+    
+    # Skriv ut debug-information
+    print(f"Hittade {len(containers)} containers i Azure Storage")
+    for container in containers:
+        print(f"- {container.name}")
+    
+    # Verifiera att vi kan lista containers
+    assert len(containers) > 0, "Kunde inte lista containers - kontrollera behörigheter"
+    
+    # Kontrollera att förväntade containers existerar
+    container_names = [c.name for c in containers]
+    assert "form-uploads" in container_names, "Container 'form-uploads' saknas"
+    assert "temp-uploads" in container_names, "Container 'temp-uploads' saknas"
+
+@pytest.mark.skipif(not os.getenv("SQLALCHEMY_DATABASE_URI"), reason="Kräver databasanslutning")
+def test_live_database_connection():
+    """Test för att verifiera databasanslutning."""
+    try:
+        from sqlalchemy import create_engine, text
+    except ImportError:
+        pytest.skip("sqlalchemy modul behövs för detta test")
+    
+    db_url = os.getenv("SQLALCHEMY_DATABASE_URI")
+    assert db_url, "SQLALCHEMY_DATABASE_URI måste vara inställd"
+    
+    # Skapa engine och testa anslutning
+    engine = create_engine(db_url)
+    with engine.connect() as connection:
+        # Kör en enkel query
+        result = connection.execute(text("SELECT 1"))
+        assert result.scalar() == 1, "Databasanslutning fungerar inte"
+        
+        # Kolla om alembic_version-tabell existerar (tecken på att migreringarna har körts)
+        result = connection.execute(text(
+            "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'alembic_version')"
+        ))
+        has_alembic = result.scalar()
+        assert has_alembic, "alembic_version-tabell hittades inte - migreringarna kanske inte har körts"
     for key, value in test_env.items():
         os.environ[key] = value
     

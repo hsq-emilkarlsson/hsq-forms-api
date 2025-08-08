@@ -1,0 +1,189 @@
+# 🚀 HSQ Forms API - Azure DevOps Infrastructure Testing Pipeline
+# Pipeline för att testa olika infrastrukturapproacher med Bicep
+
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+  paths:
+    include:
+      - infra/**
+      - azure-pipelines-infra.yml
+
+pr:
+  branches:
+    include:
+      - main
+      - develop
+  paths:
+    include:
+      - infra/**
+      - azure-pipelines-infra.yml
+
+# Pipeline-variabler
+variables:
+  # Miljöer och resursgrupper
+  dev_subscription: 'c0b03b12-570f-4442-b337-c9175ad4037f'
+  dev_resource_group: 'rg-hsq-forms-dev'
+  serviceConnection: 'SCON-HAZE-01AA-APP1066-Dev-Martechlab' # Service Connection-namn i Azure DevOps
+  location: 'westeurope'
+
+parameters:
+- name: infraApproach
+  displayName: 'Infrastruktur-approach att testa'
+  type: string
+  default: '01-default'
+  values:
+  - '01-default'
+  - '02-minimal'
+  - '03-no-vnet'
+  - '04-minimal-vnet'
+  - '05-secure'
+  - '06-avm'
+  - '07-ready'
+  - '08-appservice'
+
+- name: deployInfra
+  displayName: 'Deployment av infrastruktur'
+  type: boolean
+  default: true
+
+stages:
+- stage: ValidateBicep
+  displayName: 'Validera Bicep-mall'
+  jobs:
+  - job: ValidateTemplates
+    displayName: 'Validera infrastruktur-template'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - checkout: self
+    
+    - task: AzureCLI@2
+      displayName: 'Validera Bicep-mall'
+      inputs:
+        azureSubscription: '$(serviceConnection)'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          # Hitta relevant bicep-fil och parameter-fil baserat på vald approach
+          approach_dir="infra/approaches/${{ parameters.infraApproach }}"
+          bicep_file=$(find $approach_dir -name "*.bicep" | head -n 1)
+          params_file=$(find $approach_dir -name "*.parameters.dev.json" | head -n 1)
+          
+          echo "📋 Validerar Bicep-mall: $bicep_file"
+          echo "📋 Parametersfil: $params_file"
+          
+          # Validera template syntax (kommer inte göra deployment)
+          az deployment group validate \
+            --resource-group $(dev_resource_group) \
+            --template-file "$bicep_file" \
+            --parameters @"$params_file" \
+            --parameters dbAdminPassword="ValidateOnly123!" \
+            --verbose
+            
+          if [ $? -eq 0 ]; then
+            echo "✅ Bicep-validering lyckades!"
+          else
+            echo "❌ Bicep-validering misslyckades!"
+            exit 1
+          fi
+          
+          # Förhandsgranska ändringar (What-if)
+          echo "📊 Förhandsgranskning av infrastruktur-ändringar:"
+          az deployment group what-if \
+            --resource-group $(dev_resource_group) \
+            --template-file "$bicep_file" \
+            --parameters @"$params_file" \
+            --parameters dbAdminPassword="ValidateOnly123!" \
+            --verbose
+    
+- stage: DeployInfrastructure
+  displayName: 'Testa deployment av infrastruktur'
+  dependsOn: ValidateBicep
+  condition: and(succeeded(), eq('${{ parameters.deployInfra }}', true))
+  jobs:
+  - job: DeployInfra
+    displayName: 'Deploy infrastruktur till DEV'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - checkout: self
+    
+    - task: AzureCLI@2
+      displayName: 'Deploy Bicep (${{ parameters.infraApproach }})'
+      inputs:
+        azureSubscription: '$(serviceConnection)'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          # Hitta relevant bicep-fil och parameter-fil baserat på vald approach
+          approach_dir="infra/approaches/${{ parameters.infraApproach }}"
+          bicep_file=$(find $approach_dir -name "*.bicep" | head -n 1)
+          params_file=$(find $approach_dir -name "*.parameters.dev.json" | head -n 1)
+          
+          echo "🚀 Deploying: $bicep_file"
+          echo "🔧 Parameters: $params_file"
+          
+          # Deploy infrastructure
+          az deployment group create \
+            --resource-group $(dev_resource_group) \
+            --template-file "$bicep_file" \
+            --parameters @"$params_file" \
+            --parameters dbAdminPassword="$(DB_ADMIN_PASSWORD)" \
+            --name "hsq-forms-${{ parameters.infraApproach }}-test-$(Build.BuildId)"
+          
+          if [ $? -eq 0 ]; then
+            echo "✅ Deployment lyckades!"
+          else
+            echo "❌ Deployment misslyckades!"
+            exit 1
+          fi
+    
+    - task: AzureCLI@2
+      displayName: 'Visa skapade resurser'
+      inputs:
+        azureSubscription: '$(serviceConnection)'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          echo "📋 Lista på skapade resurser i $(dev_resource_group):"
+          az resource list --resource-group $(dev_resource_group) --output table
+          
+          echo "📊 Deployment-outputs från senaste deployment:"
+          az deployment group show \
+            --resource-group $(dev_resource_group) \
+            --name "hsq-forms-${{ parameters.infraApproach }}-test-$(Build.BuildId)" \
+            --query properties.outputs \
+            --output json
+
+- stage: CleanupInfrastructure
+  displayName: 'Rensa infrastruktur (valfritt)'
+  dependsOn: DeployInfrastructure
+  condition: false # Inaktiverad som standard, aktivera endast för rensning
+  jobs:
+  - job: CleanupResources
+    displayName: 'Rensa resurser'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - checkout: self
+    
+    - task: AzureCLI@2
+      displayName: 'Ta bort skapade resurser'
+      inputs:
+        azureSubscription: '$(serviceConnection)'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          echo "⚠️ VARNING: Detta kommer att ta bort alla resurser i $(dev_resource_group)!"
+          read -p "Är du säker att du vill fortsätta? (y/n) " -n 1 -r
+          echo
+          if [[ $REPLY =~ ^[Yy]$ ]]; then
+            echo "🧹 Tar bort resurser..."
+            az group delete --name $(dev_resource_group) --yes --no-wait
+            echo "✅ Rensning påbörjad. Resursgruppen tas bort i bakgrunden."
+          else
+            echo "❌ Rensning avbruten."
+          fi
