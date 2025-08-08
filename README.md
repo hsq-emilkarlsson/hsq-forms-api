@@ -2,6 +2,8 @@
 
 Detta projekt innehåller en API för HSQ Forms-systemet med enkel deployment till Azure App Service via Azure DevOps.
 
+> **Status:** Projektet är genomgått och förberett för deployment (2025-08-08)
+
 ## 📋 Översikt
 
 HSQ Forms API är en applikation som gör det möjligt att:

@@ -1,6 +1,7 @@
 # 🚀 HSQ Forms API - Azure DevOps Pipeline (Development)
 # Pipeline för att bygga, testa och deploya HSQ Forms API på Azure App Service
 # Denna pipeline är för utvecklingsmiljön
+# Uppdaterad och validerad: 2025-08-08
 
 trigger:
   branches:
