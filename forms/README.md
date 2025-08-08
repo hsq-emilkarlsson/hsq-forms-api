@@ -83,7 +83,30 @@ Each form is:
 - ✅ Multi-language capable
 - ✅ Production-ready
 
-## Integration with HSQ Forms API
+## Azure DevOps Deployment Strategy
+
+### Current Status
+För närvarande är enbart API:et automatiskt distribuerat via Azure DevOps-pipelinen. Formulären valideras men distribueras inte ännu.
+
+### Planerad Deployment-strategi
+Formulären kommer att distribueras som Static Web Apps eller App Service-webbappar i framtiden:
+
+1. **Static Web Apps** (Rekommenderad för nya formulär)
+   - Fördelar: Låg kostnad, global CDN, enkel deployment
+   - Användning: Formulär utan backend-funktionalitet utöver API-anrop
+
+2. **App Service Web Apps**
+   - Fördelar: Fullständig servermiljö, stöd för Node.js middleware om det behövs
+   - Användning: Mer komplexa formulär som kräver server-side rendering eller middleware
+
+### Framtida CI/CD Pipeline
+Pipeline-steget för formulär-deployment kommer att:
+1. Detektera vilka formulär som har ändrats
+2. Bygga formulären (npm build)
+3. Distribuera till Static Web Apps eller App Service
+4. Konfigurera API-integrationsinställningar automatiskt
+
+## Integration med HSQ Forms API
 
 All forms submit data to the HSQ Forms API at `http://localhost:8000` (dev) or your production API URL.
 

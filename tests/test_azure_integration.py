@@ -15,20 +15,6 @@ from pathlib import Path
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-async def test_azure_storage():
-    """
-    Test Azure Storage Service integration
-    """
-    print("🧪 Testing Azure Storage Integration...")
-    
-    # Sätt test miljövariabler (använd fake värden för test)
-    test_env = {
-        "AZURE_STORAGE_ACCOUNT_NAME": "testaccount",
-        "AZURE_STORAGE_CONTAINER_NAME": "test-uploads",
-        "AZURE_STORAGE_TEMP_CONTAINER_NAME": "test-temp",
-        "FORCE_AZURE_STORAGE": "false"  # Använd lokal storage för test
-    }
-    
 @pytest.mark.skipif(not os.getenv("AZURE_STORAGE_ACCOUNT_NAME"), reason="Kräver Azure Storage konfiguration")
 def test_live_azure_storage_connection():
     """Test för att verifiera anslutning till Azure Storage med Managed Identity."""
@@ -89,6 +75,65 @@ def test_live_database_connection():
         ))
         has_alembic = result.scalar()
         assert has_alembic, "alembic_version-tabell hittades inte - migreringarna kanske inte har körts"
+
+def test_config():
+    """
+    Test configuration loading
+    """
+    print("🔧 Testing configuration...")
+    
+    try:
+        from src.forms_api.config import get_settings
+        settings = get_settings()
+        
+        print(f"✅ Configuration loaded:")
+        print(f"   - Environment: {settings.environment}")
+        print(f"   - Database URL: {'Set' if settings.database_url else 'Not set'}")
+        print(f"   - Storage type: {settings.storage_type}")
+        print(f"   - Azure Storage Account: {settings.azure_storage_account_name or 'Not set'}")
+        
+        return True
+        
+    except Exception as e:
+        print(f"❌ Configuration test failed: {e}")
+        return False
+
+if __name__ == "__main__":
+    print("🚀 HSQ Forms API - Azure Integration Test")
+    print("=" * 50)
+    
+    # Kör tester
+    test_config()
+"""
+Test script för Azure Storage integration
+Kör detta för att validera att Azure Storage fungerar korrekt
+"""
+import asyncio
+import os
+import tempfile
+import logging
+import pytest
+from fastapi import UploadFile
+from pathlib import Path
+
+# Konfigurera logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+async def test_azure_storage():
+    """
+    Test Azure Storage Service integration
+    """
+    print("🧪 Testing Azure Storage Integration...")
+    
+    # Sätt test miljövariabler (använd fake värden för test)
+    test_env = {
+        "AZURE_STORAGE_ACCOUNT_NAME": "testaccount",
+        "AZURE_STORAGE_CONTAINER_NAME": "test-uploads",
+        "AZURE_STORAGE_TEMP_CONTAINER_NAME": "test-temp",
+        "FORCE_AZURE_STORAGE": "false"  # Använd lokal storage för test
+    }
+    
     for key, value in test_env.items():
         os.environ[key] = value
     
@@ -98,6 +143,8 @@ def test_live_database_connection():
         from app.routers.files import get_storage_service
         
         # Hämta storage service
+        storage_service, use_azure = get_storage_service()
+        print(f"✅ Storage service initialized: {'Azure' if use_azure else 'Local'}")
         storage_service, use_azure = get_storage_service()
         print(f"✅ Storage service initialized: {'Azure' if use_azure else 'Local'}")
         
