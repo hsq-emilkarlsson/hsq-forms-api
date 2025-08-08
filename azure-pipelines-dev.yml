@@ -108,11 +108,6 @@ stages:
     steps:
     - checkout: self
     
-    - task: UsePythonVersion@0
-      inputs:
-        versionSpec: '$(pythonVersion)'
-      displayName: 'Use Python $(pythonVersion)'
-    
     - script: |
         # Install jq for JSON parsing in bash scripts
         echo "📦 Installing jq for JSON parsing..."
@@ -135,13 +130,6 @@ stages:
         scriptType: 'bash'
         scriptLocation: 'inlineScript'
         inlineScript: |
-              - task: AzureCLI@2
-      displayName: 'Deploy API to Azure App Service using CLI'
-      inputs:
-        azureSubscription: 'SCON-HAZE-01AA-APP1066-Dev-Martechlab'
-        scriptType: 'bash'
-        scriptLocation: 'inlineScript'
-        inlineScript: |
           # Använd det befintliga App Service-namnet
           APP_SERVICE_NAME="hsq-forms-api-dev"
           RESOURCE_GROUP="$(resourceGroupName)"
@@ -152,7 +140,7 @@ stages:
           APP_INFO=$(az webapp show --name "$APP_SERVICE_NAME" --resource-group "$RESOURCE_GROUP")
           DEFAULT_HOSTNAME=$(echo "$APP_INFO" | jq -r '.defaultHostName')
           
-          echo "� App Service information:"
+          echo "📊 App Service information:"
           echo "  - Namn: $APP_SERVICE_NAME"
           echo "  - Default Hostname: $DEFAULT_HOSTNAME"
           
@@ -162,7 +150,7 @@ stages:
           
           echo "  - SCM Hostname: $SCM_HOSTNAME"
           
-          echo "�🔄 Deploying API to $APP_SERVICE_NAME using Azure CLI..."
+          echo "🔄 Deploying API to $APP_SERVICE_NAME using Azure CLI..."
           
           # Förbered konfiguration
           RUNTIME="PYTHON:3.11"
@@ -170,10 +158,10 @@ stages:
           
           # Uppdatera App Service-konfiguration
           echo "🔧 Uppdaterar App Service-konfiguration..."
-          az webapp config set --name "$APP_SERVICE_NAME" --resource-group "$RESOURCE_GROUP" 
-              --linux-fx-version "$RUNTIME" 
-              --startup-file "$START_COMMAND" 
-              --always-on true 
+          az webapp config set --name "$APP_SERVICE_NAME" --resource-group "$RESOURCE_GROUP" \
+              --linux-fx-version "$RUNTIME" \
+              --startup-file "$START_COMMAND" \
+              --always-on true \
               --ftps-state Disabled
           
           # Deploy ZIP-paket via kudu REST API (kringgår VNet-begränsningar)
@@ -200,25 +188,6 @@ stages:
             echo "❌ Deployment misslyckades."
             # Fortsätt trots fel så att pipelinen kan slutföra
             exit 0
-          fi"]*\)"' | head -1 | sed -e 's/.*userName="\([^"]*\)".*/\1/')
-          DEPLOY_PASSWORD=$(echo "$PUBLISH_PROFILE" | grep -o '<publishProfile[^>]*userPWD="\([^"]*\)"' | head -1 | sed -e 's/.*userPWD="\([^"]*\)".*/\1/')
-          
-          # Deploy via cURL med Basic Auth
-          echo "🔑 Utför deployment med credentials från publiceringsprofil..."
-          
-          # Använd cURL för att anropa Kudu API och gör ZIP-deployment
-          # Använd korrekt SCM-URL baserat på felmeddelandet
-          KUDU_URL="https://$APP_SERVICE_NAME-h0czdwazb0e9f7fu.scm.westeurope-01.azurewebsites.net/api/zipdeploy"
-          
-          # Uppdatera deployment
-          curl -X POST -u "$DEPLOY_USERNAME:$DEPLOY_PASSWORD" --data-binary @"$ZIP_PACKAGE" "$KUDU_URL"
-          
-          if [ $? -eq 0 ]; then
-            echo "✅ Deployment slutförd! Webbappen finns på: https://$APP_SERVICE_NAME.azurewebsites.net/"
-          else
-            echo "❌ Deployment misslyckades."
-            # Fortsätt trots fel så att pipelinen kan slutföra
-            exit 0
           fi
     
     - task: AzureCLI@2
@@ -231,10 +200,20 @@ stages:
           # Använd det befintliga App Service-namnet
           echo "🔍 Använder befintlig App Service: hsq-forms-api-dev"
           APP_SERVICE_NAME="hsq-forms-api-dev"
+          RESOURCE_GROUP="$(resourceGroupName)"
+          
+          # Hämta App Service-information för att hitta korrekt URL
+          echo "🔍 Hämtar information om App Service..."
+          APP_INFO=$(az webapp show --name "$APP_SERVICE_NAME" --resource-group "$RESOURCE_GROUP")
+          DEFAULT_HOSTNAME=$(echo "$APP_INFO" | jq -r '.defaultHostName')
+          
+          # Extrahera suffixet från default hostname för att skapa SCM URL
+          SCM_HOSTNAME="${DEFAULT_HOSTNAME/.azurewebsites.net/.scm.azurewebsites.net}"
+          
+          echo "  - SCM Hostname: $SCM_HOSTNAME"
           
           # Hämta publiceringsprofil för att köra migrering via Kudu API
-          echo "� Hämtar publiceringsprofil..."
-          RESOURCE_GROUP="$(resourceGroupName)"
+          echo "🔑 Hämtar publiceringsprofil..."
           PUBLISH_PROFILE=$(az webapp deployment list-publishing-profiles --name "$APP_SERVICE_NAME" --resource-group "$RESOURCE_GROUP" --xml)
           
           # Extrahera användarnamn och lösenord från publiceringsprofil
@@ -257,6 +236,8 @@ stages:
           KUDU_URL="https://$SCM_HOSTNAME/api/command"
           MIGRATION_COMMAND='cd site/wwwroot && python -m alembic upgrade head'
           
+          echo "📡 Anropar: $KUDU_URL"
+          
           # Anropa Kudu API för att köra migreringen
           curl -X POST -u "$DEPLOY_USERNAME:$DEPLOY_PASSWORD" "$KUDU_URL" \
                -H "Content-Type: application/json" \
@@ -271,7 +252,7 @@ stages:
             exit 0
           fi
           
-          echo "✅ API deployment slutförd! Applikationen finns på: https://$APP_SERVICE_NAME.azurewebsites.net/"
+          echo "✅ API deployment slutförd! Applikationen finns på: https://$DEFAULT_HOSTNAME/"
 
     - task: AzureCLI@2
       displayName: 'Verify Azure Connections via Remote Execution'
@@ -286,7 +267,7 @@ stages:
           echo "🔍 Använder befintlig App Service: $APP_SERVICE_NAME"
           
           # Hämta publiceringsprofil för att anropa Kudu API
-          echo "� Hämtar publiceringsprofil..."
+          echo "🔑 Hämtar publiceringsprofil..."
           PUBLISH_PROFILE=$(az webapp deployment list-publishing-profiles --name "$APP_SERVICE_NAME" --resource-group "$RESOURCE_GROUP" --xml)
           
           # Extrahera användarnamn och lösenord från publiceringsprofil
