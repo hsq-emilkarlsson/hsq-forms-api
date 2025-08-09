@@ -1,7 +1,7 @@
 # 🚀 HSQ Forms API - Azure DevOps Pipeline (Development)
 # Pipeline för att bygga, testa och deploya HSQ Forms API på Azure App Service
 # Denna pipeline är för utvecklingsmiljön
-# Uppdaterad och validerad: 2025-08-08
+# Uppdaterad och validerad: 2025-08-09
 
 trigger:
   branches:
@@ -39,24 +39,17 @@ stages:
     - task: UsePythonVersion@0
       inputs:
         versionSpec: '$(pythonVersion)'
+        addToPath: true
       displayName: 'Use Python $(pythonVersion)'
-    
+
     - script: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install -r requirements-dev.txt
-        # Explicit installation of missing dependencies to ensure all tests can run
-        pip install pytest pytest-asyncio pytest-cov pytest-env pydantic pydantic-settings jsonschema requests email-validator python-multipart
       displayName: 'Install dependencies'
-    
+
     - script: |
-        echo "📦 Installed Python packages:"
-        pip list
-      displayName: 'List installed packages'
-    
-    - script: |
-        export SKIP_API_TESTS=true
-        export PYTHONPATH=$(pwd)
+        echo "🧪 Running tests..."
         # Explicit skipping of problematic tests and setting a more informative test format
         python -m pytest tests/ -v --tb=native -k "not test_live_azure_storage_connection and not test_live_database_connection" --ignore=tests/test_webhooks.py
       displayName: 'Run tests'
@@ -102,30 +95,42 @@ stages:
   dependsOn: Infrastructure
   condition: succeeded()
   jobs:
-  - job: DeployToAppService
-    displayName: 'Deploy API to App Service'
+  - job: BuildAndDeployAPI
+    displayName: 'Build and Deploy API'
     pool:
       vmImage: 'ubuntu-latest'
     steps:
     - checkout: self
     
-    - script: |
-        # Install jq for JSON parsing in bash scripts
-        echo "📦 Installing jq for JSON parsing..."
-        sudo apt-get update && sudo apt-get install -y jq
-      displayName: 'Install utilities'
+    - task: UsePythonVersion@0
+      inputs:
+        versionSpec: '$(pythonVersion)'
+        addToPath: true
+      displayName: 'Use Python $(pythonVersion)'
 
     - script: |
-        # Create deployment package
-        echo "📦 Creating API deployment package..."
-        mkdir -p $(Build.ArtifactStagingDirectory)/app
-        cp -r src/ main.py alembic/ alembic.ini requirements.txt scripts/ $(Build.ArtifactStagingDirectory)/app/
-        cd $(Build.ArtifactStagingDirectory)
-        zip -r app.zip app/
-      displayName: 'Prepare API Deployment Package'
-    
+        echo "📦 Installerar jq för JSON-bearbetning..."
+        sudo apt-get update && sudo apt-get install -y jq
+      displayName: 'Install Required Tools'
+
+    - script: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-dev.txt
+      displayName: 'Install dependencies'
+
+    - task: ArchiveFiles@2
+      displayName: 'Create deployment package'
+      inputs:
+        rootFolderOrFile: '$(Build.SourcesDirectory)'
+        includeRootFolder: false
+        archiveType: 'zip'
+        archiveFile: '$(Build.ArtifactStagingDirectory)/app.zip'
+        replaceExistingArchive: true
+        verbose: true
+
     - task: AzureCLI@2
-      displayName: 'Deploy API to Azure App Service using CLI'
+      displayName: 'Deploy to App Service'
       inputs:
         azureSubscription: 'SCON-HAZE-01AA-APP1066-Dev-Martechlab'
         scriptType: 'bash'
@@ -134,131 +139,9 @@ stages:
           # Använd det befintliga App Service-namnet
           APP_SERVICE_NAME="hsq-forms-api-dev"
           RESOURCE_GROUP="$(resourceGroupName)"
-          ZIP_PACKAGE="$(Build.ArtifactStagingDirectory)/app.zip"
+          echo "🚀 Deploying to existing App Service: $APP_SERVICE_NAME"
           
-          # Hämta App Service-information för att hitta korrekt URL
-          echo "🔍 Hämtar information om App Service..."
-          APP_INFO=$(az webapp show --name "$APP_SERVICE_NAME" --resource-group "$RESOURCE_GROUP")
-          DEFAULT_HOSTNAME=$(echo "$APP_INFO" | jq -r '.defaultHostName')
-          
-          echo "📊 App Service information:"
-          echo "  - Namn: $APP_SERVICE_NAME"
-          echo "  - Default Hostname: $DEFAULT_HOSTNAME"
-          
-          # Extrahera suffixet från default hostname för att skapa SCM URL
-          # Pattern: hsq-forms-api-dev-h0czdwazb0e9f7fu.westeurope-01.azurewebsites.net
-          SCM_HOSTNAME="${DEFAULT_HOSTNAME/.azurewebsites.net/.scm.azurewebsites.net}"
-          
-          echo "  - SCM Hostname: $SCM_HOSTNAME"
-          
-          echo "🔄 Deploying API to $APP_SERVICE_NAME using Azure CLI..."
-          
-          # Förbered konfiguration
-          RUNTIME="PYTHON:3.11"
-          START_COMMAND="gunicorn main:app --workers 2 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000"
-          
-          # Uppdatera App Service-konfiguration
-          echo "🔧 Uppdaterar App Service-konfiguration..."
-          az webapp config set --name "$APP_SERVICE_NAME" --resource-group "$RESOURCE_GROUP" \
-              --linux-fx-version "$RUNTIME" \
-              --startup-file "$START_COMMAND" \
-              --always-on true \
-              --ftps-state Disabled
-          
-          # Uppdatera App Service-miljövariabler
-          echo "🔧 Uppdaterar App Service-miljövariabler..."
-          # Använd den kända Front Door URL:en
-          FRONT_DOOR_URL="https://hsq-forms-dev-e8g5hhgpfwgabsg5.a03.azurefd.net"
-          echo "✅ Front Door URL: $FRONT_DOOR_URL"
-          
-          # Hämta alla Static Web App URLs
-          STATIC_WEB_APPS=("b2b-feedback" "b2b-returns" "b2b-support" "b2c-returns")
-          STATIC_WEB_APP_URLS=""
-          
-          for SWA in "${STATIC_WEB_APPS[@]}"; do
-            SWA_NAME="hsq-forms-$SWA-dev"
-            SWA_INFO=$(az staticwebapp show --name "$SWA_NAME" --resource-group "$RESOURCE_GROUP" 2>/dev/null)
-            
-            if [ -n "$SWA_INFO" ]; then
-              SWA_URL=$(echo "$SWA_INFO" | jq -r '.defaultHostname')
-              if [ -n "$SWA_URL" ]; then
-                if [ -n "$STATIC_WEB_APP_URLS" ]; then
-                  STATIC_WEB_APP_URLS="$STATIC_WEB_APP_URLS,https://$SWA_URL"
-                else
-                  STATIC_WEB_APP_URLS="https://$SWA_URL"
-                fi
-                echo "✅ Static Web App URL hittades: https://$SWA_URL"
-              fi
-            else
-              echo "⚠️ Static Web App '$SWA_NAME' information kunde inte hittas."
-            fi
-          done
-          
-          # Om inga URLs hittades, använd platshållare
-          if [ -z "$STATIC_WEB_APP_URLS" ]; then
-            STATIC_WEB_APP_URLS="https://hsq-forms-b2b-feedback-dev.azurestaticapps.net,https://hsq-forms-b2b-returns-dev.azurestaticapps.net,https://hsq-forms-b2b-support-dev.azurestaticapps.net,https://hsq-forms-b2c-returns-dev.azurestaticapps.net"
-            echo "⚠️ Inga Static Web App URLs hittades. Använder platshållare."
-          fi
-          
-          # Uppdatera App Service-miljövariabler
-          az webapp config appsettings set --name "$APP_SERVICE_NAME" --resource-group "$RESOURCE_GROUP" --settings \
-            "FRONT_DOOR_URL=$FRONT_DOOR_URL" \
-            "STATIC_WEB_APP_URLS=$STATIC_WEB_APP_URLS" \
-            "ALLOW_CORS=true" \
-            "ENVIRONMENT=development" \
-            "API_KEY_HEADER_NAME=X-API-Key" \
-            "ALLOWED_API_KEYS=dev-api-key-1,dev-api-key-2" \
-            "WEBSITE_ENABLE_SYNC_UPDATE_SITE=true"
-          
-          # Deploy ZIP-paket via kudu REST API (kringgår VNet-begränsningar)
-          echo "🚀 Deploying package via Kudu REST API..."
-          
-          # Hämta publiceringsprofil
-          PUBLISH_PROFILE=$(az webapp deployment list-publishing-profiles --name "$APP_SERVICE_NAME" --resource-group "$RESOURCE_GROUP" --xml)
-          
-          # Extrahera användarnamn och lösenord från publiceringsprofil
-          DEPLOY_USERNAME=$(echo "$PUBLISH_PROFILE" | grep -o '<publishProfile[^>]*userName="\([^"]*\)"' | head -1 | sed -e 's/.*userName="\([^"]*\)".*/\1/')
-          DEPLOY_PASSWORD=$(echo "$PUBLISH_PROFILE" | grep -o '<publishProfile[^>]*userPWD="\([^"]*\)"' | head -1 | sed -e 's/.*userPWD="\([^"]*\)".*/\1/')
-          
-          # Använd cURL för att anropa Kudu API och gör ZIP-deployment
-          KUDU_URL="https://$SCM_HOSTNAME/api/zipdeploy"
-          
-          echo "📡 Deploying till: $KUDU_URL"
-          
-          # Uppdatera deployment
-          curl -X POST -u "$DEPLOY_USERNAME:$DEPLOY_PASSWORD" --data-binary @"$ZIP_PACKAGE" "$KUDU_URL"
-          
-          if [ $? -eq 0 ]; then
-            echo "✅ Deployment slutförd! Webbappen finns på: https://$DEFAULT_HOSTNAME/"
-          else
-            echo "❌ Deployment misslyckades."
-            # Fortsätt trots fel så att pipelinen kan slutföra
-            exit 0
-          fi
-    
-    - task: AzureCLI@2
-      displayName: 'Run Database Migrations'
-      inputs:
-        azureSubscription: 'SCON-HAZE-01AA-APP1066-Dev-Martechlab'
-        scriptType: 'bash'
-        scriptLocation: 'inlineScript'
-        inlineScript: |
-          # Använd det befintliga App Service-namnet
-          echo "🔍 Använder befintlig App Service: hsq-forms-api-dev"
-          APP_SERVICE_NAME="hsq-forms-api-dev"
-          RESOURCE_GROUP="$(resourceGroupName)"
-          
-          # Hämta App Service-information för att hitta korrekt URL
-          echo "🔍 Hämtar information om App Service..."
-          APP_INFO=$(az webapp show --name "$APP_SERVICE_NAME" --resource-group "$RESOURCE_GROUP")
-          DEFAULT_HOSTNAME=$(echo "$APP_INFO" | jq -r '.defaultHostName')
-          
-          # Extrahera suffixet från default hostname för att skapa SCM URL
-          SCM_HOSTNAME="${DEFAULT_HOSTNAME/.azurewebsites.net/.scm.azurewebsites.net}"
-          
-          echo "  - SCM Hostname: $SCM_HOSTNAME"
-          
-          # Hämta publiceringsprofil för att köra migrering via Kudu API
+          # Hämta publiceringsprofil för att anropa Kudu API
           echo "🔑 Hämtar publiceringsprofil..."
           PUBLISH_PROFILE=$(az webapp deployment list-publishing-profiles --name "$APP_SERVICE_NAME" --resource-group "$RESOURCE_GROUP" --xml)
           
@@ -266,9 +149,6 @@ stages:
           DEPLOY_USERNAME=$(echo "$PUBLISH_PROFILE" | grep -o '<publishProfile[^>]*userName="\([^"]*\)"' | head -1 | sed -e 's/.*userName="\([^"]*\)".*/\1/')
           DEPLOY_PASSWORD=$(echo "$PUBLISH_PROFILE" | grep -o '<publishProfile[^>]*userPWD="\([^"]*\)"' | head -1 | sed -e 's/.*userPWD="\([^"]*\)".*/\1/')
           
-          # Kör databas-migrering via Kudu API
-          echo "🔄 Kör databas-migrering via Kudu API..."
-          
           # Hämta App Service-information för att hitta korrekt URL
           echo "🔍 Hämtar information om App Service..."
           APP_INFO=$(az webapp show --name "$APP_SERVICE_NAME" --resource-group "$RESOURCE_GROUP")
@@ -277,20 +157,43 @@ stages:
           # Extrahera suffixet från default hostname för att skapa SCM URL
           SCM_HOSTNAME="${DEFAULT_HOSTNAME/.azurewebsites.net/.scm.azurewebsites.net}"
           
+          echo "  - Default Hostname: $DEFAULT_HOSTNAME"
           echo "  - SCM Hostname: $SCM_HOSTNAME"
           
-          KUDU_URL="https://$SCM_HOSTNAME/api/command"
-          MIGRATION_COMMAND='cd site/wwwroot && python -m alembic upgrade head'
+          KUDU_DEPLOY_URL="https://$SCM_HOSTNAME/api/zipdeploy"
           
-          echo "📡 Anropar: $KUDU_URL"
+          echo "🚀 Deploying application package..."
+          echo "  - Package size: $(du -h $(Build.ArtifactStagingDirectory)/app.zip | cut -f1)"
           
-          # Anropa Kudu API för att köra migreringen
-          curl -X POST -u "$DEPLOY_USERNAME:$DEPLOY_PASSWORD" "$KUDU_URL" \
+          # Använd curl för att göra en POST-förfrågan till Kudu API med deploy credentials
+          curl -X POST -u "$DEPLOY_USERNAME:$DEPLOY_PASSWORD" \
+               --data-binary "@$(Build.ArtifactStagingDirectory)/app.zip" \
+               "$KUDU_DEPLOY_URL"
+          
+          if [ $? -eq 0 ]; then
+            echo "✅ Deployment package uploaded successfully!"
+          else
+            echo "❌ Failed to upload deployment package."
+            exit 1
+          fi
+          
+          # Vänta på att App Service ska starta om och tillämpa ändringarna
+          echo "⏳ Väntar på att App Service ska starta om..."
+          sleep 30
+          
+          # Kör databasmigrering via Kudu API
+          echo "🔄 Kör databasmigrering..."
+          KUDU_COMMAND_URL="https://$SCM_HOSTNAME/api/command"
+          
+          MIGRATION_COMMAND='cd site/wwwroot && alembic upgrade head'
+          
+          # Anropa Kudu API för att köra migreringskommandot
+          curl -X POST -u "$DEPLOY_USERNAME:$DEPLOY_PASSWORD" "$KUDU_COMMAND_URL" \
                -H "Content-Type: application/json" \
                -d "{\"command\":\"$MIGRATION_COMMAND\",\"dir\":\"\"}"
           
           if [ $? -eq 0 ]; then
-            echo "✅ Databas-migrering slutförd!"
+            echo "✅ Databasmigrering slutförd!"
           else
             echo "⚠️ Det kan ha varit ett problem med databas-migreringen."
             echo "   Kontrollera loggarna i Azure Portal."
@@ -391,149 +294,109 @@ stages:
       displayName: 'Validate Forms Structure'
 
   - job: DeployForms
-  displayName: 'Deploy Form Web Applications'
-  dependsOn: ValidateForms
-  condition: succeeded()
-  pool:
-    vmImage: 'ubuntu-latest'
-  steps:
-  - checkout: self
-
-  - task: NodeTool@0
-    inputs:
-      versionSpec: '18.x'
-    displayName: 'Install Node.js'
-
-  - script: |
-      # Identifiera formulär som har ändrats sedan senaste deploy
-      echo "🔍 Identifierar formulär som behöver distribueras..."
-      cd forms
-      
-      # Kontrollera om det finns specifika formulär att deploya från pipeline-variabler
-      if [ -n "$(SPECIFIC_FORMS)" ]; then
-        echo "📋 Deploying specifika formulär: $(SPECIFIC_FORMS)"
-        FORMS_TO_DEPLOY=""
-        for FORM in $(echo $(SPECIFIC_FORMS) | tr ',' ' '); do
-          if [ -d "./hsq-forms-container-$FORM" ]; then
-            FORMS_TO_DEPLOY="$FORMS_TO_DEPLOY ./hsq-forms-container-$FORM"
-          else
-            echo "⚠️ Varning: Formulär $FORM hittades inte, skippar..."
-          fi
-        done
-      else
-        # Om inga specifika formulär angivits, kolla ändringar i git
-        echo "📋 Kontrollerar ändringar i Git..."
-        # Kontrollera om det är en initial deploy (jämför mot vår säkraste kommit)
-        LAST_SUCCESSFUL_COMMIT=$(git rev-list --max-count=1 HEAD)
-        if [ -z "$LAST_SUCCESSFUL_COMMIT" ]; then
-          echo "📋 Initial deploy, bygger alla formulär"
-          FORMS_TO_DEPLOY=$(find . -type d -name "hsq-forms-container-*" -maxdepth 1)
-        else
-          echo "📋 Söker efter ändrade formulär sedan commit $LAST_SUCCESSFUL_COMMIT"
-          # Hitta ändrade formulärmappar
-          CHANGED_FILES=$(git diff --name-only $LAST_SUCCESSFUL_COMMIT HEAD)
-          FORMS_TO_DEPLOY=""
-          for FORM_DIR in $(find . -type d -name "hsq-forms-container-*" -maxdepth 1); do
-            FORM_NAME=$(basename $FORM_DIR)
-            # Kontrollera om några filer i detta formulär har ändrats
-            if echo "$CHANGED_FILES" | grep -q "$FORM_NAME/"; then
-              FORMS_TO_DEPLOY="$FORMS_TO_DEPLOY $FORM_DIR"
-              echo "✅ Formulär $FORM_NAME har ändrats och kommer att deployas"
-            else
-              echo "ℹ️ Formulär $FORM_NAME har inte ändrats, skippar"
-            fi
-          done
-          
-          # Om inga formulär har ändrats, bygg alla ändå (för initial deploy)
-          if [ -z "$FORMS_TO_DEPLOY" ]; then
-            echo "ℹ️ Inga ändrade formulär hittades, bygger alla för säkerhets skull"
-            FORMS_TO_DEPLOY=$(find . -type d -name "hsq-forms-container-*" -maxdepth 1)
-          fi
-        fi
-      fi
-      
-      # Kontrollera om vi har formulär att deploya
-      if [ -z "$FORMS_TO_DEPLOY" ]; then
-        echo "⚠️ Inga formulär att deploya!"
-        exit 0
-      fi
-      
-      # Loopa igenom formulär och bygga dem
-      for FORM_DIR in $FORMS_TO_DEPLOY; do
-        FORM_NAME=$(basename $FORM_DIR)
-        echo "🔨 Bygger formulär: $FORM_NAME"
-        
-        pushd $FORM_DIR
-        # Installera dependencies
-        npm ci
-        # Bygg React/statiska filer
-        npm run build
-        popd
-        
-        # Skapa artifact för varje formulär
-        echo "📦 Skapar artifact för $FORM_NAME"
-        mkdir -p $(Build.ArtifactStagingDirectory)/forms/$FORM_NAME
-        cp -r $FORM_DIR/build/* $(Build.ArtifactStagingDirectory)/forms/$FORM_NAME/
-      done
-    displayName: 'Build Forms'
-
-  - task: PublishBuildArtifacts@1
-    inputs:
-      pathtoPublish: '$(Build.ArtifactStagingDirectory)/forms'
-      artifactName: 'forms'
-    displayName: 'Publish Forms Artifacts'
+    displayName: 'Deploy Form Web Applications'
+    dependsOn: ValidateForms
+    condition: succeeded()
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - checkout: self
     
-  - script: |
-      echo "🔍 För att slutföra deploymentet av varje formulär till dess egen Static Web App:"
-      echo "1. Skapa en Static Web App per formulär i Azure Portal"
-      echo "   - hsq-forms-{form-name}-dev (t.ex. hsq-forms-b2c-returns-dev)"
-      echo "2. Klicka på 'Manage Deployment Token' i varje Static Web App"
-      echo "3. Kopiera token och lägg till variabeln i pipeline med formulärnamnet:"
-      echo "   - AZURE_STATIC_WEB_APP_TOKEN_B2C_RETURNS"
-      echo "   - AZURE_STATIC_WEB_APP_TOKEN_B2B_SUPPORT"
-      echo "   osv."
-      echo "4. Sätt miljövariabeln VITE_API_URL i varje Static Web App till:"
-      echo "   https://hsq-forms-dev-e8g5hhgpfwgabsg5.a03.azurefd.net/api"
-      echo "   Detta görs i Azure Portal under Configuration för varje Static Web App"
-    displayName: 'Instruktioner för Static Web App Deployment'
-  
-  # Deployment till separata Static Web Apps
-  - script: |
-      echo "🚀 Deploying formulär till respektive Static Web Apps..."
-      
-      # B2C Returns
-      if [ -d "$(Build.ArtifactStagingDirectory)/forms/hsq-forms-container-b2c-returns" ]; then
-        echo "🚀 Deploying B2C Returns formulär..."
-        az staticwebapp deploy \
-          --source $(Build.ArtifactStagingDirectory)/forms/hsq-forms-container-b2c-returns \
-          --deployment-token $(AZURE_STATIC_WEB_APP_TOKEN_B2C_RETURNS) \
-          --no-build
-      fi
-      
-      # B2B Support
-      if [ -d "$(Build.ArtifactStagingDirectory)/forms/hsq-forms-container-b2b-support" ]; then
-        echo "🚀 Deploying B2B Support formulär..."
-        az staticwebapp deploy \
-          --source $(Build.ArtifactStagingDirectory)/forms/hsq-forms-container-b2b-support \
-          --deployment-token $(AZURE_STATIC_WEB_APP_TOKEN_B2B_SUPPORT) \
-          --no-build
-      fi
-      
-      # B2B Feedback
-      if [ -d "$(Build.ArtifactStagingDirectory)/forms/hsq-forms-container-b2b-feedback" ]; then
-        echo "🚀 Deploying B2B Feedback formulär..."
-        az staticwebapp deploy \
-          --source $(Build.ArtifactStagingDirectory)/forms/hsq-forms-container-b2b-feedback \
-          --deployment-token $(AZURE_STATIC_WEB_APP_TOKEN_B2B_FEEDBACK) \
-          --no-build
-      fi
-      
-      # B2B Returns
-      if [ -d "$(Build.ArtifactStagingDirectory)/forms/hsq-forms-container-b2b-returns" ]; then
-        echo "🚀 Deploying B2B Returns formulär..."
-        az staticwebapp deploy \
-          --source $(Build.ArtifactStagingDirectory)/forms/hsq-forms-container-b2b-returns \
-          --deployment-token $(AZURE_STATIC_WEB_APP_TOKEN_B2B_RETURNS) \
-          --no-build
-      fi
-    displayName: 'Deploy Forms to Static Web Apps'
+    - task: NodeTool@0
+      inputs:
+        versionSpec: '18.x'
+      displayName: 'Install Node.js'
+    
+    - script: |
+        # Kontrollera om formulärmappen finns
+        if [ -d "forms" ]; then
+          # Lista alla formulär
+          FORMS=$(find forms -type d -name "hsq-forms-container-*")
+          
+          if [ -n "$FORMS" ]; then
+            echo "📦 Bygger formulär..."
+            
+            for FORM_PATH in $FORMS; do
+              FORM_NAME=$(basename $FORM_PATH)
+              echo "🔨 Bygger $FORM_NAME..."
+              
+              # Navigera till formulärmappen
+              cd $FORM_PATH
+              
+              # Skapa .env.production med API-slutpunkt
+              echo "VITE_API_URL=https://hsq-forms-dev-e8g5hhgpfwgabsg5.a03.azurefd.net" > .env.production
+              echo "VITE_API_KEY_HEADER_NAME=X-API-Key" >> .env.production
+              echo "VITE_API_KEY=dev-api-key-1" >> .env.production
+              
+              # Installera och bygg
+              npm install
+              npm run build
+              
+              # Kopiera build-mappen till artifact staging directory
+              mkdir -p $(Build.ArtifactStagingDirectory)/forms/$FORM_NAME
+              cp -r dist/* $(Build.ArtifactStagingDirectory)/forms/$FORM_NAME/
+              
+              # Återvänd till roten
+              cd $(Build.SourcesDirectory)
+            done
+            
+            echo "✅ Alla formulär byggda!"
+          else
+            echo "⚠️ Inga formulär hittades i 'forms/'-mappen"
+          fi
+        else
+          echo "⚠️ Mappen 'forms/' hittades inte"
+        fi
+      displayName: 'Build Forms'
+    
+    - task: AzureCLI@2
+      displayName: 'Deploy Forms to Static Web Apps'
+      inputs:
+        azureSubscription: 'SCON-HAZE-01AA-APP1066-Dev-Martechlab'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          # Kontrollera om det finns byggda formulär att deploya
+          if [ ! -d "$(Build.ArtifactStagingDirectory)/forms" ]; then
+            echo "⚠️ Inga byggda formulär hittades för deployment"
+            exit 0
+          fi
+          
+          echo "🚀 Förbereder för deployment av formulär..."
+          
+          # B2C Returns
+          if [ -d "$(Build.ArtifactStagingDirectory)/forms/hsq-forms-container-b2c-returns" ]; then
+            echo "🚀 Deploying B2C Returns formulär..."
+            az staticwebapp deploy \
+              --source $(Build.ArtifactStagingDirectory)/forms/hsq-forms-container-b2c-returns \
+              --deployment-token $(AZURE_STATIC_WEB_APP_TOKEN_B2C_RETURNS) \
+              --no-build
+          fi
+          
+          # B2B Support
+          if [ -d "$(Build.ArtifactStagingDirectory)/forms/hsq-forms-container-b2b-support" ]; then
+            echo "🚀 Deploying B2B Support formulär..."
+            az staticwebapp deploy \
+              --source $(Build.ArtifactStagingDirectory)/forms/hsq-forms-container-b2b-support \
+              --deployment-token $(AZURE_STATIC_WEB_APP_TOKEN_B2B_SUPPORT) \
+              --no-build
+          fi
+          
+          # B2B Feedback
+          if [ -d "$(Build.ArtifactStagingDirectory)/forms/hsq-forms-container-b2b-feedback" ]; then
+            echo "🚀 Deploying B2B Feedback formulär..."
+            az staticwebapp deploy \
+              --source $(Build.ArtifactStagingDirectory)/forms/hsq-forms-container-b2b-feedback \
+              --deployment-token $(AZURE_STATIC_WEB_APP_TOKEN_B2B_FEEDBACK) \
+              --no-build
+          fi
+          
+          # B2B Returns
+          if [ -d "$(Build.ArtifactStagingDirectory)/forms/hsq-forms-container-b2b-returns" ]; then
+            echo "🚀 Deploying B2B Returns formulär..."
+            az staticwebapp deploy \
+              --source $(Build.ArtifactStagingDirectory)/forms/hsq-forms-container-b2b-returns \
+              --deployment-token $(AZURE_STATIC_WEB_APP_TOKEN_B2B_RETURNS) \
+              --no-build
+          fi
+      displayName: 'Deploy Forms to Static Web Apps'
