@@ -13,7 +13,7 @@ alembic==1.12.1
 azure-storage-blob==12.19.0
 azure-identity==1.15.0
 python-magic==0.4.27
-python-magic-bin==0.4.14  # För Windows och Linux-stöd
+# python-magic-bin==0.4.14  # För Windows och Linux-stöd (endast för Windows, kommenterad bort för Linux-miljö)
 aiohttp==3.12.7  # Required for async Azure Storage operations
 
 # API-specifika

@@ -44,6 +44,11 @@ stages:
       displayName: 'Use Python $(pythonVersion)'
 
     - script: |
+        echo "Installerar systempaket som krävs för python-magic..."
+        sudo apt-get update && sudo apt-get install -y libmagic-dev
+      displayName: 'Install system dependencies'
+
+    - script: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install -r requirements-dev.txt
@@ -74,7 +79,7 @@ stages:
     
     - script: |
         echo "📦 Installerar jq för JSON-bearbetning..."
-        sudo apt-get update && sudo apt-get install -y jq
+        sudo apt-get update && sudo apt-get install -y jq libmagic-dev
       displayName: 'Install Required Tools'
 
     - script: |
