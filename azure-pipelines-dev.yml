@@ -349,6 +349,10 @@ stages:
         inlineScript: |
           echo "🚀 Förbereder för deployment av formulär..."
           
+          # Installera Static Web Apps-extension för Azure CLI
+          echo "📦 Installerar Azure Static Web Apps extension..."
+          az extension add --name staticwebapp --upgrade --yes
+          
           # B2C Returns
           if [ -d "$(Pipeline.Workspace)/forms/hsq-forms-container-b2c-returns" ]; then
             echo "🚀 Deploying B2C Returns formulär..."
