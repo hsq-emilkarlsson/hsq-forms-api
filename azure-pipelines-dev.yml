@@ -340,49 +340,149 @@ stages:
         fi
       displayName: 'Validate Forms Structure'
 
-# Framtida formulärdistributionsjobb (inaktiverat tills vidare)
-# - job: DeployForms
-#   displayName: 'Deploy Form Web Applications'
-#   dependsOn: ValidateForms
-#   condition: succeeded()
-#   pool:
-#     vmImage: 'ubuntu-latest'
-#   steps:
-#   - checkout: self
-#
-#   - task: NodeTool@0
-#     inputs:
-#       versionSpec: '18.x'
-#     displayName: 'Install Node.js'
-#
-#   - script: |
-#       # Identifiera formulär som har ändrats sedan senaste deploy
-#       echo "🔍 Identifierar formulär som behöver distribueras..."
-#       cd forms
-#       FORMS_TO_DEPLOY=$(find . -type d -name "hsq-forms-container-*" -maxdepth 1)
-#       
-#       # Loopa igenom formulär och bygga dem
-#       for FORM_DIR in $FORMS_TO_DEPLOY; do
-#         FORM_NAME=$(basename $FORM_DIR)
-#         echo "🔨 Bygger formulär: $FORM_NAME"
-#         
-#         cd $FORM_DIR
-#         # Installera dependencies
-#         npm ci
-#         # Bygg React/statiska filer
-#         npm run build
-#         cd ..
-#         
-#         # Skapa artifact för varje formulär
-#         mkdir -p $(Build.ArtifactStagingDirectory)/forms/$FORM_NAME
-#         cp -r $FORM_DIR/build/* $(Build.ArtifactStagingDirectory)/forms/$FORM_NAME/
-#       done
-#     displayName: 'Build Forms'
-#
-#   - task: AzureStaticWebApp@0
-#     inputs:
-#       app_location: '/forms'
-#       api_location: '' # Kan vara tom eftersom API redan är deployat separat
-#       output_location: 'build'
-#       azure_static_web_apps_api_token: $(AZURE_STATIC_WEB_APP_TOKEN)
-#     displayName: 'Deploy Forms to Azure Static Web Apps'
+- job: DeployForms
+  displayName: 'Deploy Form Web Applications'
+  dependsOn: ValidateForms
+  condition: succeeded()
+  pool:
+    vmImage: 'ubuntu-latest'
+  steps:
+  - checkout: self
+
+  - task: NodeTool@0
+    inputs:
+      versionSpec: '18.x'
+    displayName: 'Install Node.js'
+
+  - script: |
+      # Identifiera formulär som har ändrats sedan senaste deploy
+      echo "🔍 Identifierar formulär som behöver distribueras..."
+      cd forms
+      
+      # Kontrollera om det finns specifika formulär att deploya från pipeline-variabler
+      if [ -n "$(SPECIFIC_FORMS)" ]; then
+        echo "📋 Deploying specifika formulär: $(SPECIFIC_FORMS)"
+        FORMS_TO_DEPLOY=""
+        for FORM in $(echo $(SPECIFIC_FORMS) | tr ',' ' '); do
+          if [ -d "./hsq-forms-container-$FORM" ]; then
+            FORMS_TO_DEPLOY="$FORMS_TO_DEPLOY ./hsq-forms-container-$FORM"
+          else
+            echo "⚠️ Varning: Formulär $FORM hittades inte, skippar..."
+          fi
+        done
+      else
+        # Om inga specifika formulär angivits, kolla ändringar i git
+        echo "📋 Kontrollerar ändringar i Git..."
+        # Kontrollera om det är en initial deploy (jämför mot vår säkraste kommit)
+        LAST_SUCCESSFUL_COMMIT=$(git rev-list --max-count=1 HEAD)
+        if [ -z "$LAST_SUCCESSFUL_COMMIT" ]; then
+          echo "📋 Initial deploy, bygger alla formulär"
+          FORMS_TO_DEPLOY=$(find . -type d -name "hsq-forms-container-*" -maxdepth 1)
+        else
+          echo "📋 Söker efter ändrade formulär sedan commit $LAST_SUCCESSFUL_COMMIT"
+          # Hitta ändrade formulärmappar
+          CHANGED_FILES=$(git diff --name-only $LAST_SUCCESSFUL_COMMIT HEAD)
+          FORMS_TO_DEPLOY=""
+          for FORM_DIR in $(find . -type d -name "hsq-forms-container-*" -maxdepth 1); do
+            FORM_NAME=$(basename $FORM_DIR)
+            # Kontrollera om några filer i detta formulär har ändrats
+            if echo "$CHANGED_FILES" | grep -q "$FORM_NAME/"; then
+              FORMS_TO_DEPLOY="$FORMS_TO_DEPLOY $FORM_DIR"
+              echo "✅ Formulär $FORM_NAME har ändrats och kommer att deployas"
+            else
+              echo "ℹ️ Formulär $FORM_NAME har inte ändrats, skippar"
+            fi
+          done
+          
+          # Om inga formulär har ändrats, bygg alla ändå (för initial deploy)
+          if [ -z "$FORMS_TO_DEPLOY" ]; then
+            echo "ℹ️ Inga ändrade formulär hittades, bygger alla för säkerhets skull"
+            FORMS_TO_DEPLOY=$(find . -type d -name "hsq-forms-container-*" -maxdepth 1)
+          fi
+        fi
+      fi
+      
+      # Kontrollera om vi har formulär att deploya
+      if [ -z "$FORMS_TO_DEPLOY" ]; then
+        echo "⚠️ Inga formulär att deploya!"
+        exit 0
+      fi
+      
+      # Loopa igenom formulär och bygga dem
+      for FORM_DIR in $FORMS_TO_DEPLOY; do
+        FORM_NAME=$(basename $FORM_DIR)
+        echo "🔨 Bygger formulär: $FORM_NAME"
+        
+        pushd $FORM_DIR
+        # Installera dependencies
+        npm ci
+        # Bygg React/statiska filer
+        npm run build
+        popd
+        
+        # Skapa artifact för varje formulär
+        echo "📦 Skapar artifact för $FORM_NAME"
+        mkdir -p $(Build.ArtifactStagingDirectory)/forms/$FORM_NAME
+        cp -r $FORM_DIR/build/* $(Build.ArtifactStagingDirectory)/forms/$FORM_NAME/
+      done
+    displayName: 'Build Forms'
+
+  - task: PublishBuildArtifacts@1
+    inputs:
+      pathtoPublish: '$(Build.ArtifactStagingDirectory)/forms'
+      artifactName: 'forms'
+    displayName: 'Publish Forms Artifacts'
+    
+  - script: |
+      echo "🔍 För att slutföra deploymentet av varje formulär till dess egen Static Web App:"
+      echo "1. Skapa en Static Web App per formulär i Azure Portal"
+      echo "   - hsq-forms-{form-name}-dev (t.ex. hsq-forms-b2c-returns-dev)"
+      echo "2. Klicka på 'Manage Deployment Token' i varje Static Web App"
+      echo "3. Kopiera token och lägg till variabeln i pipeline med formulärnamnet:"
+      echo "   - AZURE_STATIC_WEB_APP_TOKEN_B2C_RETURNS"
+      echo "   - AZURE_STATIC_WEB_APP_TOKEN_B2B_SUPPORT"
+      echo "   osv."
+      echo "4. När tokens är konfigurerade, avkommentera och anpassa deployment-steget"
+      echo "   i pipeline-filen med rätt token-variabler för varje formulär"
+    displayName: 'Instruktioner för Static Web App Deployment'
+  
+  # Deployment till separata Static Web Apps
+  - script: |
+      echo "🚀 Deploying formulär till respektive Static Web Apps..."
+      
+      # B2C Returns
+      if [ -d "$(Build.ArtifactStagingDirectory)/forms/hsq-forms-container-b2c-returns" ]; then
+        echo "🚀 Deploying B2C Returns formulär..."
+        az staticwebapp deploy \
+          --source $(Build.ArtifactStagingDirectory)/forms/hsq-forms-container-b2c-returns \
+          --deployment-token $(AZURE_STATIC_WEB_APP_TOKEN_B2C_RETURNS) \
+          --no-build
+      fi
+      
+      # B2B Support
+      if [ -d "$(Build.ArtifactStagingDirectory)/forms/hsq-forms-container-b2b-support" ]; then
+        echo "🚀 Deploying B2B Support formulär..."
+        az staticwebapp deploy \
+          --source $(Build.ArtifactStagingDirectory)/forms/hsq-forms-container-b2b-support \
+          --deployment-token $(AZURE_STATIC_WEB_APP_TOKEN_B2B_SUPPORT) \
+          --no-build
+      fi
+      
+      # B2B Feedback
+      if [ -d "$(Build.ArtifactStagingDirectory)/forms/hsq-forms-container-b2b-feedback" ]; then
+        echo "🚀 Deploying B2B Feedback formulär..."
+        az staticwebapp deploy \
+          --source $(Build.ArtifactStagingDirectory)/forms/hsq-forms-container-b2b-feedback \
+          --deployment-token $(AZURE_STATIC_WEB_APP_TOKEN_B2B_FEEDBACK) \
+          --no-build
+      fi
+      
+      # B2B Returns
+      if [ -d "$(Build.ArtifactStagingDirectory)/forms/hsq-forms-container-b2b-returns" ]; then
+        echo "🚀 Deploying B2B Returns formulär..."
+        az staticwebapp deploy \
+          --source $(Build.ArtifactStagingDirectory)/forms/hsq-forms-container-b2b-returns \
+          --deployment-token $(AZURE_STATIC_WEB_APP_TOKEN_B2B_RETURNS) \
+          --no-build
+      fi
+    displayName: 'Deploy Forms to Static Web Apps'
