@@ -108,7 +108,14 @@ Pipeline-steget för formulär-deployment kommer att:
 
 ## Integration med HSQ Forms API
 
-All forms submit data to the HSQ Forms API at `http://localhost:8000` (dev) or your production API URL.
+All forms submit data to the HSQ Forms API. Use the following:
+
+- Dev environment (local): `http://localhost:8000/api`
+- Production environment: `https://hsq-forms-dev-e8g5hhgpfwgabsg5.a03.azurefd.net/api`
+
+Configure the API URL in your Static Web App's Configuration settings:
+- Name: `VITE_API_URL`
+- Value: `https://hsq-forms-dev-e8g5hhgpfwgabsg5.a03.azurefd.net/api`
 
 The API handles:
 

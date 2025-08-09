@@ -18,6 +18,8 @@ Infrastrukturen för projektet är redan uppsatt manuellt i Azure. Azure DevOps-
 ### Befintliga resurser:
 - **App Service (hsq-forms-api-dev)** - Kör API:et som en Python-applikation
 - **App Service Plan (sq-forms-plan-dev)** - Beräkningsresurser för App Service
+- **Azure Front Door (hsq-forms-dev-e8g5hhgpfwgabsg5.a03.azurefd.net)** - Hanterar trafik till API:et via Private Link
+- **Static Web Apps** - Varje formulär körs i en separat Static Web App
 - **PostgreSQL Flexible Server (hsq-forms-db-dev)** - Databas
 - **Storage Account (hsqformsdev)** - För att lagra filer och formulär
 - **Log Analytics Workspace (hsq-forms-logs-dev)** - För loggning
