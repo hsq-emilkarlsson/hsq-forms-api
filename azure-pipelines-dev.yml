@@ -340,51 +340,44 @@ stages:
       artifact: forms
       displayName: 'Download Forms Artifacts'
       
-    - task: AzureCLI@2
+    - script: |
+        echo "🚀 Förbereder för deployment av formulär..."
+        
+        # Installera Static Web Apps CLI
+        echo "📦 Installerar Static Web Apps CLI..."
+        npm install -g @azure/static-web-apps-cli
+        
+        # Deploya formulär med Static Web Apps CLI
+        
+        # B2C Returns
+        if [ -d "$(Pipeline.Workspace)/forms/hsq-forms-container-b2c-returns" ]; then
+          echo "🚀 Deploying B2C Returns formulär..."
+          npx @azure/static-web-apps-cli deploy $(Pipeline.Workspace)/forms/hsq-forms-container-b2c-returns \
+            --deployment-token $(AZURE_STATIC_WEB_APP_TOKEN_B2C_RETURNS) \
+            --env production
+        fi
+        
+        # B2B Support
+        if [ -d "$(Pipeline.Workspace)/forms/hsq-forms-container-b2b-support" ]; then
+          echo "🚀 Deploying B2B Support formulär..."
+          npx @azure/static-web-apps-cli deploy $(Pipeline.Workspace)/forms/hsq-forms-container-b2b-support \
+            --deployment-token $(AZURE_STATIC_WEB_APP_TOKEN_B2B_SUPPORT) \
+            --env production
+        fi
+        
+        # B2B Feedback
+        if [ -d "$(Pipeline.Workspace)/forms/hsq-forms-container-b2b-feedback" ]; then
+          echo "🚀 Deploying B2B Feedback formulär..."
+          npx @azure/static-web-apps-cli deploy $(Pipeline.Workspace)/forms/hsq-forms-container-b2b-feedback \
+            --deployment-token $(AZURE_STATIC_WEB_APP_TOKEN_B2B_FEEDBACK) \
+            --env production
+        fi
+        
+        # B2B Returns
+        if [ -d "$(Pipeline.Workspace)/forms/hsq-forms-container-b2b-returns" ]; then
+          echo "🚀 Deploying B2B Returns formulär..."
+          npx @azure/static-web-apps-cli deploy $(Pipeline.Workspace)/forms/hsq-forms-container-b2b-returns \
+            --deployment-token $(AZURE_STATIC_WEB_APP_TOKEN_B2B_RETURNS) \
+            --env production
+        fi
       displayName: 'Deploy Forms to Static Web Apps'
-      inputs:
-        azureSubscription: 'SCON-HAZE-01AA-APP1066-Dev-Martechlab'
-        scriptType: 'bash'
-        scriptLocation: 'inlineScript'
-        inlineScript: |
-          echo "🚀 Förbereder för deployment av formulär..."
-          
-          # Installera Static Web Apps-extension för Azure CLI
-          echo "📦 Installerar Azure Static Web Apps extension..."
-          az extension add --name staticwebapp --upgrade --yes
-          
-          # B2C Returns
-          if [ -d "$(Pipeline.Workspace)/forms/hsq-forms-container-b2c-returns" ]; then
-            echo "🚀 Deploying B2C Returns formulär..."
-            az staticwebapp deploy \
-              --source $(Pipeline.Workspace)/forms/hsq-forms-container-b2c-returns \
-              --deployment-token $(AZURE_STATIC_WEB_APP_TOKEN_B2C_RETURNS) \
-              --no-build
-          fi
-          
-          # B2B Support
-          if [ -d "$(Pipeline.Workspace)/forms/hsq-forms-container-b2b-support" ]; then
-            echo "🚀 Deploying B2B Support formulär..."
-            az staticwebapp deploy \
-              --source $(Pipeline.Workspace)/forms/hsq-forms-container-b2b-support \
-              --deployment-token $(AZURE_STATIC_WEB_APP_TOKEN_B2B_SUPPORT) \
-              --no-build
-          fi
-          
-          # B2B Feedback
-          if [ -d "$(Pipeline.Workspace)/forms/hsq-forms-container-b2b-feedback" ]; then
-            echo "🚀 Deploying B2B Feedback formulär..."
-            az staticwebapp deploy \
-              --source $(Pipeline.Workspace)/forms/hsq-forms-container-b2b-feedback \
-              --deployment-token $(AZURE_STATIC_WEB_APP_TOKEN_B2B_FEEDBACK) \
-              --no-build
-          fi
-          
-          # B2B Returns
-          if [ -d "$(Pipeline.Workspace)/forms/hsq-forms-container-b2b-returns" ]; then
-            echo "🚀 Deploying B2B Returns formulär..."
-            az staticwebapp deploy \
-              --source $(Pipeline.Workspace)/forms/hsq-forms-container-b2b-returns \
-              --deployment-token $(AZURE_STATIC_WEB_APP_TOKEN_B2B_RETURNS) \
-              --no-build
-          fi
