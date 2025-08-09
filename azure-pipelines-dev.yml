@@ -357,6 +357,11 @@ stages:
           
           echo "✅ Verifieringssteget slutfört. Se Azure Portal för detaljerade loggar."
 
+- stage: FormOperations
+  displayName: 'Form Operations'
+  dependsOn: DeployApp
+  condition: succeeded()
+  jobs:
   - job: ValidateForms
     displayName: 'Validate Forms (Prepare for Future Deployment)'
     pool:
@@ -385,7 +390,7 @@ stages:
         fi
       displayName: 'Validate Forms Structure'
 
-- job: DeployForms
+  - job: DeployForms
   displayName: 'Deploy Form Web Applications'
   dependsOn: ValidateForms
   condition: succeeded()
