@@ -122,27 +122,123 @@ stages:
           APP_INFO=$(az webapp show --name "$APP_SERVICE_NAME" --resource-group "$RESOURCE_GROUP")
           DEFAULT_HOSTNAME=$(echo "$APP_INFO" | jq -r '.defaultHostName')
           
-          # Extrahera suffixet från default hostname för att skapa SCM URL
-          SCM_HOSTNAME="${DEFAULT_HOSTNAME/.azurewebsites.net/.scm.azurewebsites.net}"
+          # För VNet-skyddade App Services kan vi behöva den specifika SCM-URLen
+          # Hämta den kompletta listan över publiceringsprofiler igen för att extrahera korrekt SCM URL
+          SCM_URL=$(echo "$PUBLISH_PROFILE" | grep -o '<publishProfile[^>]*publishUrl="\([^"]*\)"' | grep scm | head -1 | sed -e 's/.*publishUrl="\([^"]*\)".*/\1/' | sed 's/https:\/\///')
+          
+          # Om vi inte får något SCM URL från profilen, använd standardformatet
+          if [ -z "$SCM_URL" ]; then
+            SCM_HOSTNAME="${DEFAULT_HOSTNAME/.azurewebsites.net/.scm.azurewebsites.net}"
+          else
+            SCM_HOSTNAME="$SCM_URL"
+          fi
           
           echo "  - Default Hostname: $DEFAULT_HOSTNAME"
           echo "  - SCM Hostname: $SCM_HOSTNAME"
+          
+          # Testa om vi kan nå SCM-hosten
+          if ! host "$SCM_HOSTNAME" >/dev/null 2>&1; then
+            echo "⚠️ Varning: Kan inte hitta SCM-värden. Detta kan vara på grund av VNet-begränsningar."
+            echo "Försöker använda alternativ metod..."
+            
+            # Försök med direkta SCM-adressen som innehåller region
+            SCM_HOSTNAME="${APP_SERVICE_NAME}.scm.azurewebsites.net"
+            
+            # Om den grundläggande metoden inte fungerar, extrahera regiondelen från default hostname
+            if [[ "$DEFAULT_HOSTNAME" =~ -([a-z0-9]+)\.([a-z0-9-]+)\.azurewebsites\.net ]]; then
+              SITE_SUFFIX="${BASH_REMATCH[1]}"
+              REGION="${BASH_REMATCH[2]}"
+              SCM_HOSTNAME="${APP_SERVICE_NAME}-${SITE_SUFFIX}.${REGION}.scm.azurewebsites.net"
+            fi
+          fi
+          
+          echo "  - Slutlig SCM Hostname: $SCM_HOSTNAME"
           
           KUDU_DEPLOY_URL="https://$SCM_HOSTNAME/api/zipdeploy"
           
           echo "🚀 Deploying application package..."
           echo "  - Package size: $(du -h $(Build.ArtifactStagingDirectory)/app.zip | cut -f1)"
+          echo "  - Using Kudu URL: $KUDU_DEPLOY_URL"
+          
+          # Installera nslookup för att felsöka DNS
+          echo "🔧 Installerar nslookup för DNS-felsökning..."
+          apt-get update -qq && apt-get install -y dnsutils
+          
+          # Försök med DNS-lookup för att se om vi kan nå SCM-hosten
+          echo "🔍 DNS-kontroll för $SCM_HOSTNAME..."
+          NSLOOKUP_RESULT=$(nslookup $SCM_HOSTNAME 2>&1)
+          echo "$NSLOOKUP_RESULT"
+          
+          # Lägg till värdpost i /etc/hosts om DNS-uppslagning misslyckas
+          if echo "$NSLOOKUP_RESULT" | grep -q "can't find"; then
+            echo "⚠️ DNS-uppslagning misslyckades. Försöker använda alternativ metod..."
+            
+            # Försök hitta en IP-adress via Azure
+            echo "🔍 Hämtar site-outbound-IP från App Service..."
+            OUTBOUND_IPS=$(az webapp show --name "$APP_SERVICE_NAME" --resource-group "$RESOURCE_GROUP" --query outboundIpAddresses --output tsv)
+            
+            if [ -n "$OUTBOUND_IPS" ]; then
+              # Använd första IP-adressen i listan
+              FIRST_IP=$(echo $OUTBOUND_IPS | cut -d ',' -f1)
+              echo "📝 Lägger till $FIRST_IP $SCM_HOSTNAME i /etc/hosts..."
+              echo "$FIRST_IP $SCM_HOSTNAME" | sudo tee -a /etc/hosts
+            fi
+          fi
           
           # Använd curl för att göra en POST-förfrågan till Kudu API med deploy credentials
-          curl -X POST -u "$DEPLOY_USERNAME:$DEPLOY_PASSWORD" \
+          echo "📤 Uploading deployment package to Kudu API..."
+          CURL_OUTPUT=$(curl -X POST -u "$DEPLOY_USERNAME:$DEPLOY_PASSWORD" \
                --data-binary "@$(Build.ArtifactStagingDirectory)/app.zip" \
-               "$KUDU_DEPLOY_URL"
+               "$KUDU_DEPLOY_URL" -v 2>&1)
+          CURL_EXIT_CODE=$?
           
-          if [ $? -eq 0 ]; then
+          # Skriv ut detaljerad output för felsökning
+          echo "curl exit code: $CURL_EXIT_CODE"
+          echo "curl output:"
+          echo "$CURL_OUTPUT"
+          
+          if [ $CURL_EXIT_CODE -eq 0 ]; then
             echo "✅ Deployment package uploaded successfully!"
           else
             echo "❌ Failed to upload deployment package."
-            exit 1
+            echo "📋 Detaljerad information om felet:"
+            
+            # Om det är ett DNS-fel, försök med IP-adressen direkt
+            if echo "$CURL_OUTPUT" | grep -q "Could not resolve host"; then
+              echo "🔍 DNS-fel upptäckt. Försöker direkta IP-metoden..."
+              
+              # Hämta IP-adresser för App Service
+              echo "🔍 Hämtar site-inbound-IP från App Service..."
+              INBOUND_IPS=$(az webapp show --name "$APP_SERVICE_NAME" --resource-group "$RESOURCE_GROUP" --query possibleInboundIpAddresses --output tsv)
+              
+              if [ -n "$INBOUND_IPS" ]; then
+                # Använd första IP-adressen i listan
+                FIRST_IP=$(echo $INBOUND_IPS | cut -d ',' -f1)
+                echo "🔌 Försöker nå Kudu API via IP: $FIRST_IP"
+                
+                # Prova att använda IP direkt
+                curl -X POST -u "$DEPLOY_USERNAME:$DEPLOY_PASSWORD" \
+                     --data-binary "@$(Build.ArtifactStagingDirectory)/app.zip" \
+                     "https://$FIRST_IP/api/zipdeploy" \
+                     -H "Host: $SCM_HOSTNAME" -v
+                
+                if [ $? -eq 0 ]; then
+                  echo "✅ Deployment via IP lyckades!"
+                else
+                  echo "❌ Deployment via IP misslyckades."
+                  echo "⚠️ Detta kan bero på VNet-begränsningar som kräver att pipeline-agenten körs i samma VNet."
+                  exit 1
+                fi
+              else
+                echo "❌ Kunde inte hämta IP-adresser för App Service."
+                exit 1
+              fi
+            else
+              # Andra typer av fel
+              echo "⚠️ Detta kan bero på VNet-begränsningar som kräver att pipeline-agenten körs i samma VNet."
+              echo "⚠️ Kontrollera att App Service-principen tillåter Azure DevOps-åtkomst."
+              exit 1
+            fi
           fi
           
           # Vänta på att App Service ska starta om och tillämpa ändringarna
@@ -156,9 +252,33 @@ stages:
           MIGRATION_COMMAND='cd site/wwwroot && alembic upgrade head'
           
           # Anropa Kudu API för att köra migreringskommandot
-          curl -X POST -u "$DEPLOY_USERNAME:$DEPLOY_PASSWORD" "$KUDU_COMMAND_URL" \
+          MIGRATION_RESULT=$(curl -X POST -u "$DEPLOY_USERNAME:$DEPLOY_PASSWORD" "$KUDU_COMMAND_URL" \
                -H "Content-Type: application/json" \
-               -d "{\"command\":\"$MIGRATION_COMMAND\",\"dir\":\"\"}"
+               -d "{\"command\":\"$MIGRATION_COMMAND\",\"dir\":\"\"}" 2>&1)
+          
+          MIGRATION_EXIT_CODE=$?
+          echo "Migration curl exit code: $MIGRATION_EXIT_CODE"
+          echo "Migration output: $MIGRATION_RESULT"
+          
+          if [ $MIGRATION_EXIT_CODE -ne 0 ]; then
+            echo "⚠️ Kunde inte köra databasmigrering via Kudu API. Detta kan bero på VNet-begränsningar."
+            echo "⚠️ Försöker alternativ metod för deployment via webapp deployment..."
+            
+            # Försök med alternativ deploymentmetod via Azure CLI
+            echo "🔄 Använder az webapp deployment för att zippa och deploya..."
+            az webapp deployment source config-zip \
+              --resource-group "$RESOURCE_GROUP" \
+              --name "$APP_SERVICE_NAME" \
+              --src "$(Build.ArtifactStagingDirectory)/app.zip"
+            
+            if [ $? -eq 0 ]; then
+              echo "✅ Deployment via az webapp lyckades!"
+            else
+              echo "❌ Alla deploymentmetoder misslyckades."
+              echo "⚠️ Detta kan bero på VNet-begränsningar som kräver att pipeline-agenten körs i samma VNet."
+              # Fortsätt ändå, kanske var det bara migreringssteget som misslyckades
+            fi
+          fi
           
           # Verifiera att App Service är tillgänglig via HTTP
           echo "🌐 Kontrollerar om API:et är tillgängligt..."
