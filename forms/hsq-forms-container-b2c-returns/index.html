@@ -9,5 +9,18 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <!-- Lägg till diagnostikverktyget i utvecklingsmiljön -->
+    <script>
+      // Endast lägg till debug-skriptet i utvecklingsmiljö
+      if (window.location.hostname === 'localhost' || 
+          window.location.hostname === '127.0.0.1' ||
+          window.location.hostname.includes('azurestaticapps.net')) {
+        const script = document.createElement('script');
+        script.src = 'https://hsq-forms-dev-e8g5hhgpfwgabsg5.a03.azurefd.net/scripts/hsq-forms-debugger.js';
+        script.async = true;
+        document.body.appendChild(script);
+        console.log('HSQ Forms debugger loaded');
+      }
+    </script>
   </body>
 </html>
