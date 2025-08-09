@@ -76,12 +76,14 @@ const B2BFeedbackForm = () => {
     
     try {
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const apiKey = import.meta.env.VITE_API_KEY || 'dev-api-key-1';
       const templateId = 'b2b-feedback';
       
       const response = await fetch(`${apiUrl}/api/templates/${templateId}/submit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-API-Key': apiKey
         },
         body: JSON.stringify({
           data: data,

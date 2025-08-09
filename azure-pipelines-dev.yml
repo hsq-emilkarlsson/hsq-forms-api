@@ -204,6 +204,10 @@ stages:
           az webapp config appsettings set --name "$APP_SERVICE_NAME" --resource-group "$RESOURCE_GROUP" --settings \
             "FRONT_DOOR_URL=$FRONT_DOOR_URL" \
             "STATIC_WEB_APP_URLS=$STATIC_WEB_APP_URLS" \
+            "ALLOW_CORS=true" \
+            "ENVIRONMENT=development" \
+            "API_KEY_HEADER_NAME=X-API-Key" \
+            "ALLOWED_API_KEYS=dev-api-key-1,dev-api-key-2" \
             "WEBSITE_ENABLE_SYNC_UPDATE_SITE=true"
           
           # Deploy ZIP-paket via kudu REST API (kringgår VNet-begränsningar)
